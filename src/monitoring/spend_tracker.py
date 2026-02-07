@@ -1,0 +1,211 @@
+"""
+AI spend tracking and budget enforcement for Sticker Trendz.
+
+Estimates OpenAI and Replicate costs, tracks cumulative daily and monthly
+spend, and enforces budget caps ($120 warning, $150 hard stop per month).
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+from src.db import SupabaseClient, DatabaseError
+
+logger = logging.getLogger(__name__)
+
+# GPT-4o-mini pricing (per the spec)
+GPT4O_MINI_INPUT_COST_PER_TOKEN: float = 0.15 / 1_000_000   # $0.15 per 1M input tokens
+GPT4O_MINI_OUTPUT_COST_PER_TOKEN: float = 0.60 / 1_000_000  # $0.60 per 1M output tokens
+
+# Replicate SDXL pricing (estimated midpoint)
+REPLICATE_COST_PER_IMAGE: float = 0.04
+
+# Budget thresholds
+MONTHLY_WARNING_USD: float = 120.0
+MONTHLY_HARD_STOP_USD: float = 150.0
+DAILY_WARNING_USD: float = 8.0
+
+
+def estimate_openai_cost(input_tokens: int, output_tokens: int) -> float:
+    """
+    Estimate OpenAI API cost for a GPT-4o-mini request.
+
+    Args:
+        input_tokens: Number of input tokens.
+        output_tokens: Number of output tokens.
+
+    Returns:
+        Estimated cost in USD.
+    """
+    return round(
+        input_tokens * GPT4O_MINI_INPUT_COST_PER_TOKEN
+        + output_tokens * GPT4O_MINI_OUTPUT_COST_PER_TOKEN,
+        6,
+    )
+
+
+def estimate_replicate_cost(image_count: int) -> float:
+    """
+    Estimate Replicate image generation cost.
+
+    Args:
+        image_count: Number of images generated.
+
+    Returns:
+        Estimated cost in USD.
+    """
+    return round(image_count * REPLICATE_COST_PER_IMAGE, 4)
+
+
+class SpendTracker:
+    """
+    Tracks AI spend against daily and monthly budget caps.
+
+    Reads cumulative costs from the pipeline_runs table and enforces
+    the $120 warning / $150 hard-stop thresholds.
+    """
+
+    def __init__(
+        self,
+        db: Optional[SupabaseClient] = None,
+        monthly_warning: float = MONTHLY_WARNING_USD,
+        monthly_cap: float = MONTHLY_HARD_STOP_USD,
+        daily_warning: float = DAILY_WARNING_USD,
+    ) -> None:
+        self._db = db or SupabaseClient()
+        self._monthly_warning = monthly_warning
+        self._monthly_cap = monthly_cap
+        self._daily_warning = daily_warning
+
+    def get_daily_spend(self, date: Optional[datetime] = None) -> float:
+        """
+        Sum ai_cost_estimate_usd from pipeline_runs for a given date.
+
+        Args:
+            date: Date to query. Defaults to today (UTC).
+
+        Returns:
+            Total AI spend in USD for the day.
+        """
+        target = date or datetime.now(timezone.utc)
+        date_str = target.strftime("%Y-%m-%d")
+
+        try:
+            rows = self._db.select(
+                "pipeline_runs",
+                columns="ai_cost_estimate_usd",
+            )
+            total = 0.0
+            for row in rows:
+                started = row.get("started_at", "")
+                if isinstance(started, str) and started.startswith(date_str):
+                    cost = row.get("ai_cost_estimate_usd")
+                    if cost is not None:
+                        total += float(cost)
+            return round(total, 4)
+        except DatabaseError as exc:
+            logger.error("Failed to query daily AI spend: %s", exc)
+            return 0.0
+
+    def get_monthly_spend(self, year: Optional[int] = None, month: Optional[int] = None) -> float:
+        """
+        Sum ai_cost_estimate_usd from pipeline_runs for a given month.
+
+        Args:
+            year: Year to query. Defaults to current year.
+            month: Month to query. Defaults to current month.
+
+        Returns:
+            Total AI spend in USD for the month.
+        """
+        now = datetime.now(timezone.utc)
+        y = year or now.year
+        m = month or now.month
+        prefix = f"{y}-{m:02d}"
+
+        try:
+            rows = self._db.select(
+                "pipeline_runs",
+                columns="ai_cost_estimate_usd,started_at",
+            )
+            total = 0.0
+            for row in rows:
+                started = row.get("started_at", "")
+                if isinstance(started, str) and started.startswith(prefix):
+                    cost = row.get("ai_cost_estimate_usd")
+                    if cost is not None:
+                        total += float(cost)
+            return round(total, 4)
+        except DatabaseError as exc:
+            logger.error("Failed to query monthly AI spend: %s", exc)
+            return 0.0
+
+    def check_budget(self) -> dict:
+        """
+        Check current monthly spend against budget thresholds.
+
+        Returns:
+            Dict with keys:
+              - can_proceed (bool): True if under the hard stop cap.
+              - monthly_spend (float): Current month's total.
+              - warning (bool): True if past the warning threshold.
+              - hard_stop (bool): True if past the hard stop threshold.
+              - message (str): Human-readable status.
+        """
+        monthly = self.get_monthly_spend()
+        hard_stop = monthly >= self._monthly_cap
+        warning = monthly >= self._monthly_warning
+
+        if hard_stop:
+            message = (
+                f"HARD STOP: Monthly AI spend ${monthly:.2f} exceeds "
+                f"cap ${self._monthly_cap:.2f}. All AI operations halted."
+            )
+            logger.critical(message)
+        elif warning:
+            message = (
+                f"WARNING: Monthly AI spend ${monthly:.2f} approaching "
+                f"cap ${self._monthly_cap:.2f}."
+            )
+            logger.warning(message)
+        else:
+            message = f"Monthly AI spend: ${monthly:.2f} / ${self._monthly_cap:.2f}"
+            logger.info(message)
+
+        return {
+            "can_proceed": not hard_stop,
+            "monthly_spend": monthly,
+            "warning": warning,
+            "hard_stop": hard_stop,
+            "message": message,
+        }
+
+    def check_daily_budget(self) -> dict:
+        """
+        Check current daily spend against the daily warning threshold.
+
+        Returns:
+            Dict with keys:
+              - daily_spend (float): Today's total.
+              - warning (bool): True if past the daily warning.
+              - message (str): Human-readable status.
+        """
+        daily = self.get_daily_spend()
+        warning = daily >= self._daily_warning
+
+        if warning:
+            message = (
+                f"WARNING: Daily AI spend ${daily:.2f} exceeds "
+                f"threshold ${self._daily_warning:.2f}."
+            )
+            logger.warning(message)
+        else:
+            message = f"Daily AI spend: ${daily:.2f} / ${self._daily_warning:.2f}"
+
+        return {
+            "daily_spend": daily,
+            "warning": warning,
+            "message": message,
+        }

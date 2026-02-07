@@ -1,0 +1,91 @@
+# Keyword Blocklist for Sticker Trendz
+# Offensive, inappropriate, and NSFW terms.
+# One entry per line. Case-insensitive matching.
+# Lines starting with # are comments.
+
+# --- Hate Speech / Slurs ---
+racist
+racism
+nazi
+fascist
+white supremacy
+supremacist
+ethnic slur
+hate crime
+
+# --- Violence ---
+murder
+killing
+massacre
+terrorism
+terrorist
+bomb threat
+mass shooting
+genocide
+torture
+mutilation
+
+# --- Sexual Content ---
+pornography
+porn
+xxx
+nsfw
+nude
+nudity
+sexual assault
+pedophile
+pedophilia
+
+# --- Drug References ---
+cocaine
+heroin
+methamphetamine
+meth
+crack cocaine
+fentanyl
+drug dealer
+drug trafficking
+
+# --- Self-Harm ---
+suicide
+self-harm
+cutting
+anorexia
+
+# --- Profanity (strong) ---
+fuck
+shit
+bitch
+asshole
+cunt
+dick
+bastard
+motherfucker
+bullshit
+piss
+
+# --- Discriminatory ---
+sexist
+sexism
+homophobic
+homophobia
+transphobic
+transphobia
+ableist
+ableism
+misogyny
+misogynist
+
+# --- Controversial Political ---
+swastika
+confederate flag
+isis
+al-qaeda
+jihad
+
+# --- Scam / Illegal ---
+counterfeit
+pirated
+stolen
+fraud
+scam

@@ -1,0 +1,223 @@
+# Trademark Blocklist for Sticker Trendz
+# One entry per line. Case-insensitive matching.
+# Lines starting with # are comments.
+
+# --- Major Tech Brands ---
+apple
+google
+microsoft
+amazon
+meta
+facebook
+instagram
+tiktok
+snapchat
+twitter
+netflix
+spotify
+tesla
+nvidia
+samsung
+sony
+lg
+hp
+dell
+intel
+amd
+ibm
+oracle
+adobe
+salesforce
+
+# --- Fashion / Luxury Brands ---
+nike
+adidas
+puma
+reebok
+gucci
+louis vuitton
+chanel
+prada
+hermes
+versace
+dior
+balenciaga
+supreme
+off-white
+yeezy
+jordan
+converse
+vans
+new balance
+
+# --- Entertainment / Media Companies ---
+disney
+pixar
+marvel
+dc comics
+warner bros
+universal studios
+paramount
+dreamworks
+lucasfilm
+hbo
+hulu
+fox
+cbs
+nbc
+
+# --- Fictional Characters ---
+mickey mouse
+minnie mouse
+donald duck
+goofy
+winnie the pooh
+buzz lightyear
+woody
+nemo
+elsa
+moana
+simba
+pikachu
+charizard
+mario
+luigi
+sonic the hedgehog
+sonic
+spongebob
+patrick star
+homer simpson
+bart simpson
+peter griffin
+rick sanchez
+morty smith
+goku
+naruto
+luffy
+hello kitty
+barbie
+optimus prime
+spider-man
+spiderman
+batman
+superman
+wonder woman
+iron man
+captain america
+hulk
+thor
+black panther
+deadpool
+wolverine
+groot
+baby yoda
+grogu
+yoda
+darth vader
+chewbacca
+r2-d2
+baby groot
+
+# --- Celebrity Names ---
+taylor swift
+beyonce
+drake
+kanye west
+rihanna
+ariana grande
+billie eilish
+olivia rodrigo
+harry styles
+doja cat
+bad bunny
+bts
+blackpink
+travis scott
+post malone
+dua lipa
+lizzo
+the weeknd
+ed sheeran
+adele
+justin bieber
+selena gomez
+lady gaga
+kardashian
+kim kardashian
+kylie jenner
+kendall jenner
+lebron james
+stephen curry
+messi
+ronaldo
+cristiano ronaldo
+tom brady
+elon musk
+jeff bezos
+mark zuckerberg
+oprah
+
+# --- Sports Teams / Leagues ---
+nfl
+nba
+mlb
+nhl
+fifa
+premier league
+la lakers
+golden state warriors
+new york yankees
+dallas cowboys
+new england patriots
+chicago bulls
+boston celtics
+manchester united
+real madrid
+barcelona fc
+liverpool fc
+
+# --- Food / Beverage Brands ---
+coca-cola
+pepsi
+mcdonalds
+burger king
+starbucks
+dunkin
+subway
+chipotle
+chick-fil-a
+wendys
+taco bell
+kfc
+dominos
+red bull
+monster energy
+
+# --- Automotive ---
+ferrari
+lamborghini
+porsche
+bmw
+mercedes
+audi
+toyota
+honda
+ford
+chevrolet
+jeep
+
+# --- Other Protected Brands ---
+lego
+hot wheels
+nerf
+monopoly
+pokemon
+nintendo
+playstation
+xbox
+roblox
+minecraft
+fortnite
+call of duty
+league of legends
+among us
