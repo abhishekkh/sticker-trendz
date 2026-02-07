@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from src.db import SupabaseClient, DatabaseError
+from src.monitoring.alerter import EmailAlerter
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +71,17 @@ class SpendTracker:
     def __init__(
         self,
         db: Optional[SupabaseClient] = None,
+        alerter: Optional[EmailAlerter] = None,
         monthly_warning: float = MONTHLY_WARNING_USD,
         monthly_cap: float = MONTHLY_HARD_STOP_USD,
         daily_warning: float = DAILY_WARNING_USD,
     ) -> None:
         self._db = db or SupabaseClient()
+        self._alerter = alerter or EmailAlerter()
         self._monthly_warning = monthly_warning
         self._monthly_cap = monthly_cap
         self._daily_warning = daily_warning
+        self._alert_sent_for_month: Optional[str] = None  # Track if we already alerted this month
 
     def get_daily_spend(self, date: Optional[datetime] = None) -> float:
         """
@@ -146,6 +150,10 @@ class SpendTracker:
         """
         Check current monthly spend against budget thresholds.
 
+        Sends alert emails:
+        - At $120 warning threshold
+        - At $150 hard stop threshold
+
         Returns:
             Dict with keys:
               - can_proceed (bool): True if under the hard stop cap.
@@ -158,18 +166,36 @@ class SpendTracker:
         hard_stop = monthly >= self._monthly_cap
         warning = monthly >= self._monthly_warning
 
+        # Track current month to avoid duplicate alerts
+        now = datetime.now(timezone.utc)
+        current_month = f"{now.year}-{now.month:02d}"
+
         if hard_stop:
             message = (
                 f"HARD STOP: Monthly AI spend ${monthly:.2f} exceeds "
                 f"cap ${self._monthly_cap:.2f}. All AI operations halted."
             )
             logger.critical(message)
+            # Send hard stop alert (only once per month)
+            if self._alert_sent_for_month != current_month:
+                try:
+                    self._alerter.send_budget_warning(monthly, self._monthly_cap)
+                    self._alert_sent_for_month = current_month
+                except Exception as exc:
+                    logger.error("Failed to send budget hard stop alert: %s", exc)
         elif warning:
             message = (
                 f"WARNING: Monthly AI spend ${monthly:.2f} approaching "
                 f"cap ${self._monthly_cap:.2f}."
             )
             logger.warning(message)
+            # Send warning alert (only once per month)
+            if self._alert_sent_for_month != current_month:
+                try:
+                    self._alerter.send_budget_warning(monthly, self._monthly_cap)
+                    self._alert_sent_for_month = current_month
+                except Exception as exc:
+                    logger.error("Failed to send budget warning alert: %s", exc)
         else:
             message = f"Monthly AI spend: ${monthly:.2f} / ${self._monthly_cap:.2f}"
             logger.info(message)
@@ -186,6 +212,8 @@ class SpendTracker:
         """
         Check current daily spend against the daily warning threshold.
 
+        Sends alert email if daily spend exceeds $8.
+
         Returns:
             Dict with keys:
               - daily_spend (float): Today's total.
@@ -201,6 +229,17 @@ class SpendTracker:
                 f"threshold ${self._daily_warning:.2f}."
             )
             logger.warning(message)
+            # Send daily warning alert
+            try:
+                subject = f"Daily AI spend warning: ${daily:.2f}"
+                body = (
+                    f"Daily AI spend has reached ${daily:.2f}, "
+                    f"exceeding the ${self._daily_warning:.2f} warning threshold.\n\n"
+                    f"Please review pipeline runs to ensure costs are under control."
+                )
+                self._alerter.send_alert(subject, body, level="warning")
+            except Exception as exc:
+                logger.error("Failed to send daily spend warning alert: %s", exc)
         else:
             message = f"Daily AI spend: ${daily:.2f} / ${self._daily_warning:.2f}"
 
