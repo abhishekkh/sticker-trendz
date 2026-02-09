@@ -22,6 +22,21 @@ logger = logging.getLogger(__name__)
 DEFAULT_SUBREDDITS = ["memes", "funny", "trending"]
 
 # Common English stop words to filter out of keyword extraction
+MAX_TOPIC_LENGTH = 500
+MAX_SELFTEXT_LENGTH = 1000
+
+# Regex for stripping HTML tags and control characters
+_HTML_TAG_RE = re.compile(r"<[^>]*>")
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def sanitize_external_text(text: str, max_length: int = MAX_TOPIC_LENGTH) -> str:
+    """Strip HTML tags, control characters, and enforce max length on external text."""
+    text = _HTML_TAG_RE.sub("", text)
+    text = _CONTROL_CHAR_RE.sub("", text)
+    return text.strip()[:max_length]
+
+
 STOP_WORDS: Set[str] = {
     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
     "from", "had", "has", "have", "he", "her", "his", "how", "i",
@@ -139,12 +154,14 @@ class RedditSource:
         for submission in subreddit.hot(limit=limit):
             posts.append({
                 "id": submission.id,
-                "title": submission.title,
+                "title": sanitize_external_text(submission.title, MAX_TOPIC_LENGTH),
                 "score": submission.score,
                 "upvote_ratio": submission.upvote_ratio,
                 "num_comments": submission.num_comments,
                 "url": submission.url,
-                "selftext": getattr(submission, "selftext", "")[:500],
+                "selftext": sanitize_external_text(
+                    getattr(submission, "selftext", ""), MAX_SELFTEXT_LENGTH
+                ),
                 "subreddit": subreddit_name,
                 "created_utc": submission.created_utc,
             })

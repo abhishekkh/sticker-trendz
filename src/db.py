@@ -17,6 +17,67 @@ from src.config import load_config, ConfigError
 
 logger = logging.getLogger(__name__)
 
+# Column whitelist per table to prevent injection via filter keys
+_ALLOWED_COLUMNS: Dict[str, frozenset] = {
+    "trends": frozenset({
+        "id", "topic", "topic_normalized", "source", "sources", "keywords",
+        "status", "score_overall", "score_velocity", "score_sentiment",
+        "created_at", "updated_at",
+    }),
+    "stickers": frozenset({
+        "id", "trend_id", "title", "description", "tags", "image_url",
+        "thumbnail_url", "original_url", "size", "price", "floor_price",
+        "moderation_status", "moderation_score", "moderation_categories",
+        "current_pricing_tier", "etsy_listing_id", "published_at",
+        "generation_prompt", "generation_model", "generation_model_version",
+        "fulfillment_provider", "sales_count", "view_count", "last_sale_at",
+        "created_at", "updated_at",
+    }),
+    "orders": frozenset({
+        "id", "sticker_id", "etsy_receipt_id", "status", "quantity",
+        "price_at_sale", "pricing_tier_at_sale", "created_at", "updated_at",
+    }),
+    "pipeline_runs": frozenset({
+        "id", "workflow", "status", "started_at", "ended_at",
+        "duration_seconds", "trends_found", "stickers_generated",
+        "prices_updated", "stickers_archived", "errors_count",
+        "etsy_api_calls_used", "ai_cost_estimate_usd", "metadata",
+    }),
+    "error_log": frozenset({
+        "id", "workflow", "step", "error_type", "error_message", "service",
+        "pipeline_run_id", "retry_count", "resolved", "context", "created_at",
+    }),
+    "etsy_tokens": frozenset({
+        "id", "shop_id", "access_token", "refresh_token", "expires_at",
+        "updated_at",
+    }),
+    "pricing_tiers": frozenset({
+        "id", "tier", "min_trend_age_days", "max_trend_age_days",
+        "price_single_small", "price_single_large",
+    }),
+    "shipping_rates": frozenset({
+        "id", "product_type", "fulfillment_provider", "shipping_cost",
+        "packaging_cost", "is_active",
+    }),
+    "price_history": frozenset({
+        "id", "sticker_id", "old_price", "new_price", "pricing_tier",
+        "reason", "created_at",
+    }),
+}
+
+
+def _validate_filter_columns(table: str, filters: Dict[str, Any]) -> None:
+    """Validate that filter column names are in the allowed whitelist."""
+    allowed = _ALLOWED_COLUMNS.get(table)
+    if allowed is None:
+        return  # Unknown table, skip validation
+    for col in filters:
+        if col not in allowed:
+            raise DatabaseError(
+                f"Invalid column '{col}' for table '{table}'. "
+                f"Allowed: {sorted(allowed)}"
+            )
+
 
 class DatabaseError(Exception):
     """Raised on database operation failures."""
@@ -94,6 +155,7 @@ class SupabaseClient:
         self, table: str, filters: Dict[str, Any], data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Update rows matching filters. Returns updated records."""
+        _validate_filter_columns(table, filters)
         try:
             query = self._client.table(table).update(data)
             for col, val in filters.items():
@@ -113,6 +175,8 @@ class SupabaseClient:
         limit: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Select rows from a table with optional filters, ordering, and limit."""
+        if filters:
+            _validate_filter_columns(table, filters)
         try:
             query = self._client.table(table).select(columns)
             if filters:
@@ -132,6 +196,7 @@ class SupabaseClient:
 
     def delete(self, table: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Delete rows matching filters. Returns deleted records."""
+        _validate_filter_columns(table, filters)
         try:
             query = self._client.table(table).delete()
             for col, val in filters.items():

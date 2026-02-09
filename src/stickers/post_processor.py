@@ -192,7 +192,8 @@ def _optimize_png(img: Image.Image, max_bytes: int) -> bytes:
     under the size limit.
     """
     buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
+    pnginfo = img.info.copy() if hasattr(img, "info") else {}
+    img.save(buf, format="PNG", optimize=True, dpi=PRINT_READY_DPI)
     data = buf.getvalue()
 
     if len(data) <= max_bytes:
@@ -203,7 +204,7 @@ def _optimize_png(img: Image.Image, max_bytes: int) -> bytes:
         quantized = img.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
         quantized = quantized.convert("RGBA")
         buf2 = io.BytesIO()
-        quantized.save(buf2, format="PNG", optimize=True)
+        quantized.save(buf2, format="PNG", optimize=True, dpi=PRINT_READY_DPI)
         data2 = buf2.getvalue()
         if len(data2) <= max_bytes:
             return data2

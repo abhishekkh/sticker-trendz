@@ -199,9 +199,28 @@ class EtsyPublisher:
             return
 
         try:
+            # Validate image URL is from our R2 bucket (prevent SSRF)
+            cfg = load_config(require_all=False)
+            if cfg.r2.public_url and not image_url.startswith(cfg.r2.public_url):
+                logger.warning(
+                    "Image URL not from R2 bucket, skipping upload: %s",
+                    image_url[:100],
+                )
+                return
+
             # Download image from R2
             img_response = self._http.get(image_url, timeout=30)
             img_response.raise_for_status()
+
+            # Validate content type
+            content_type = img_response.headers.get("Content-Type", "")
+            if not content_type.startswith("image/"):
+                logger.warning(
+                    "Invalid content type '%s' for image URL, skipping",
+                    content_type,
+                )
+                return
+
             image_bytes = img_response.content
 
             # Upload to Etsy

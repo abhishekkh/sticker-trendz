@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from src.trends.sources.reddit import extract_keywords
+from src.trends.sources.reddit import extract_keywords, sanitize_external_text
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class GoogleTrendsSource:
 
             if trending_searches is not None and not trending_searches.empty:
                 for _, row in trending_searches.iterrows():
-                    term = str(row[0]).strip()
+                    term = sanitize_external_text(str(row[0]).strip())
                     if not term:
                         continue
                     keywords = extract_keywords(term)
@@ -115,7 +115,7 @@ class GoogleTrendsSource:
                 if realtime is not None and not realtime.empty:
                     title_col = "title" if "title" in realtime.columns else realtime.columns[0]
                     for _, row in realtime.iterrows():
-                        term = str(row.get(title_col, row.iloc[0])).strip()
+                        term = sanitize_external_text(str(row.get(title_col, row.iloc[0])).strip())
                         if not term:
                             continue
                         keywords = extract_keywords(term)

@@ -118,13 +118,20 @@ class ImageGenerator:
         )
 
         # Replicate returns a list of URLs
-        if isinstance(output, list) and len(output) > 0:
-            image_url = str(output[0])
-            response = httpx.get(image_url, timeout=60)
-            response.raise_for_status()
-            return response.content
+        if not isinstance(output, list) or len(output) == 0:
+            raise ImageGeneratorError(
+                f"Replicate returned unexpected output: {type(output).__name__}"
+            )
 
-        raise ImageGeneratorError("Replicate returned no output")
+        image_url = str(output[0])
+        response = httpx.get(image_url, timeout=60)
+        response.raise_for_status()
+        image_bytes = response.content
+
+        if len(image_bytes) == 0:
+            raise ImageGeneratorError("Replicate returned empty image")
+
+        return image_bytes
 
     def generate_for_trend(
         self,
