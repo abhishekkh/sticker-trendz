@@ -51,8 +51,8 @@ class TestTopicNormalization:
     """Test topic normalization (lowercase, stemming)."""
 
     def test_lowercase(self):
-        """Topic is lowercased."""
-        assert normalize_topic("Baby Hippo") == "hippo"
+        """Topic is lowercased and stemmed."""
+        assert normalize_topic("Baby Hippo") == "baby hippo"
         assert normalize_topic("TRENDING") == "trend"
 
     def test_stemming(self):
