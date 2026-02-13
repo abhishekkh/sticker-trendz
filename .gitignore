@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# Etsy OAuth tokens (contains secrets)
+.etsy_token.json
+
 # Python
 __pycache__/
 *.py[cod]

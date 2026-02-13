@@ -62,6 +62,9 @@ class EtsyPublisher:
         self._api_key = etsy_api_key or cfg.etsy.api_key
         self._http = http_client or httpx.Client(timeout=30)
         self._max_active = max_active_listings
+        self._taxonomy_id = cfg.etsy.taxonomy_id
+        self._shipping_profile_id = cfg.etsy.shipping_profile_id
+        self._shop_sections = cfg.etsy.shop_sections
 
     def _get_headers(self) -> Dict[str, str]:
         """Get authorization headers for Etsy API calls."""
@@ -78,6 +81,22 @@ class EtsyPublisher:
         """Track an Etsy API call in Redis."""
         if self._rate_limiter:
             self._rate_limiter.increment_api_calls(count)
+
+    # Pricing tier → shop section mapping
+    _TIER_TO_SECTION = {
+        "just_dropped": "new_drops",
+        "trending": "trending_now",
+        "cooling": "popular",
+        "evergreen": "under_5",
+    }
+
+    def _resolve_shop_section(self, sticker: Dict[str, Any]) -> Optional[int]:
+        """Map a sticker's pricing tier to the corresponding Etsy shop section ID."""
+        if not self._shop_sections:
+            return None
+        tier = sticker.get("pricing_tier", "")
+        section_key = self._TIER_TO_SECTION.get(tier, "")
+        return self._shop_sections.get(section_key)
 
     def create_listing(
         self,
@@ -124,7 +143,7 @@ class EtsyPublisher:
             description = f"Trending {topic} sticker."
 
         # Build listing payload
-        payload = {
+        payload: Dict[str, Any] = {
             "title": title[:140],
             "description": description,
             "price": price,
@@ -133,9 +152,18 @@ class EtsyPublisher:
             "is_supply": False,
             "quantity": 999,
             "tags": tags[:13],
-            "shipping_profile_id": None,  # Set during shop setup
             "state": "draft",
         }
+
+        if self._taxonomy_id:
+            payload["taxonomy_id"] = self._taxonomy_id
+        if self._shipping_profile_id:
+            payload["shipping_profile_id"] = self._shipping_profile_id
+
+        # Map pricing tier to shop section
+        section_id = self._resolve_shop_section(sticker)
+        if section_id:
+            payload["shop_section_id"] = section_id
 
         try:
             headers = self._get_headers()

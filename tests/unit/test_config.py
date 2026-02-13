@@ -21,6 +21,9 @@ class TestLoadConfig:
         with patch.dict(os.environ, {}, clear=True):
             config = load_config(require_all=False)
             assert config.openai.api_key == ""
+            assert config.replicate.model_id == "black-forest-labs/flux-schnell"
+            assert config.replicate.model_version == ""
+            assert config.replicate.image_size == 1024
             assert config.caps.max_trends_per_cycle == 5
 
     def test_load_config_reads_all_env_vars(self):
@@ -28,7 +31,9 @@ class TestLoadConfig:
         env = {
             "OPENAI_API_KEY": "sk-test",
             "REPLICATE_API_TOKEN": "r8-test",
+            "REPLICATE_MODEL_ID": "stability-ai/sdxl",
             "REPLICATE_MODEL_VERSION": "abc123",
+            "REPLICATE_IMAGE_SIZE": "512",
             "SUPABASE_URL": "https://test.supabase.co",
             "SUPABASE_SERVICE_KEY": "supa-key",
             "UPSTASH_REDIS_URL": "https://redis.upstash.io",
@@ -56,7 +61,9 @@ class TestLoadConfig:
             config = load_config(require_all=True)
             assert config.openai.api_key == "sk-test"
             assert config.replicate.api_token == "r8-test"
+            assert config.replicate.model_id == "stability-ai/sdxl"
             assert config.replicate.model_version == "abc123"
+            assert config.replicate.image_size == 512
             assert config.supabase.url == "https://test.supabase.co"
             assert config.redis.url == "https://redis.upstash.io"
             assert config.r2.bucket == "sticker-trendz"

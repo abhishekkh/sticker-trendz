@@ -8,6 +8,7 @@ spend, and enforces budget caps ($120 warning, $150 hard stop per month).
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -20,8 +21,20 @@ logger = logging.getLogger(__name__)
 GPT4O_MINI_INPUT_COST_PER_TOKEN: float = 0.15 / 1_000_000   # $0.15 per 1M input tokens
 GPT4O_MINI_OUTPUT_COST_PER_TOKEN: float = 0.60 / 1_000_000  # $0.60 per 1M output tokens
 
-# Replicate SDXL pricing (estimated midpoint)
-REPLICATE_COST_PER_IMAGE: float = 0.04
+# Replicate cost per image – configurable via env var (default: FLUX Schnell ~$0.003)
+def _load_replicate_cost() -> float:
+    raw = os.getenv("REPLICATE_COST_PER_IMAGE")
+    if raw is None:
+        return 0.003
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning(
+            "REPLICATE_COST_PER_IMAGE has non-numeric value '%s', using default 0.003", raw,
+        )
+        return 0.003
+
+REPLICATE_COST_PER_IMAGE: float = _load_replicate_cost()
 
 # Budget thresholds
 MONTHLY_WARNING_USD: float = 120.0

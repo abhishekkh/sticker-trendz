@@ -1,7 +1,7 @@
 """
-Replicate SDXL image generator for Sticker Trendz.
+Replicate image generator for Sticker Trendz.
 
-Generates sticker images at 1024x1024 PNG via Replicate's Stable Diffusion XL.
+Generates sticker images via Replicate (model configurable via REPLICATE_MODEL_ID).
 Orchestrates the full flow: prompt generation, image generation, quality
 validation, post-processing, and upload to R2.
 """
@@ -40,11 +40,11 @@ class ImageGeneratorError(Exception):
 
 class ImageGenerator:
     """
-    Replicate SDXL image generator with full pipeline orchestration.
+    Replicate image generator with full pipeline orchestration.
 
     For each trend with status='discovered':
       1. Generate 3 image prompts (via PromptGenerator)
-      2. Generate images via Replicate SDXL
+      2. Generate images via Replicate (model from REPLICATE_MODEL_ID)
       3. Validate quality
       4. Post-process (crop, resize, transparency)
       5. Upload to R2
@@ -78,6 +78,8 @@ class ImageGenerator:
         cfg = load_config(require_all=False)
         self._replicate_token = replicate_api_token or cfg.replicate.api_token
         self._model_version = replicate_model_version or cfg.replicate.model_version
+        self._model_id = cfg.replicate.model_id
+        self._image_size = cfg.replicate.image_size
 
         if not self._replicate_client and self._replicate_token:
             try:
@@ -101,17 +103,17 @@ class ImageGenerator:
             raise ImageGeneratorError("Replicate client not initialized")
 
         model_ref = (
-            f"stability-ai/sdxl:{self._model_version}"
+            f"{self._model_id}:{self._model_version}"
             if self._model_version
-            else "stability-ai/sdxl"
+            else self._model_id
         )
 
         output = self._replicate_client.run(
             model_ref,
             input={
                 "prompt": prompt,
-                "width": 1024,
-                "height": 1024,
+                "width": self._image_size,
+                "height": self._image_size,
                 "num_outputs": 1,
                 "output_format": "png",
             },
@@ -261,7 +263,7 @@ class ImageGenerator:
                     "original_url": original_url,
                     "size": "3in",
                     "generation_prompt": current_prompt[:1000],
-                    "generation_model": "stable-diffusion-xl",
+                    "generation_model": self._model_id,
                     "generation_model_version": self._model_version or "",
                     "moderation_status": "pending",
                 }

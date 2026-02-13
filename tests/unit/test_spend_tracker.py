@@ -47,12 +47,12 @@ class TestEstimateFunctions:
         assert cost == 0.0
 
     def test_estimate_replicate_cost_calculates_correctly(self):
-        """Replicate cost should be $0.04 per image."""
+        """Replicate cost should use REPLICATE_COST_PER_IMAGE per image."""
         image_count = 10
 
         cost = estimate_replicate_cost(image_count)
 
-        assert cost == 0.4  # 10 * 0.04
+        assert cost == round(10 * REPLICATE_COST_PER_IMAGE, 4)
 
     def test_estimate_replicate_cost_with_zero_images(self):
         """Cost should be zero when no images are generated."""
@@ -62,7 +62,7 @@ class TestEstimateFunctions:
     def test_estimate_replicate_cost_rounds_correctly(self):
         """Cost should be rounded to 4 decimal places."""
         cost = estimate_replicate_cost(3)
-        assert cost == 0.12  # 3 * 0.04, rounded to 4 decimals
+        assert cost == round(3 * REPLICATE_COST_PER_IMAGE, 4)
 
 
 class TestSpendTracker:

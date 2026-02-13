@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Dict, Optional
 
 from dotenv import load_dotenv
 
@@ -69,6 +69,28 @@ def _optional_float(name: str, default: float) -> float:
         return default
 
 
+def _load_shop_sections() -> Dict[str, int]:
+    """Load Etsy shop section IDs from environment variables."""
+    section_map = {
+        "trending_now": "ETSY_SECTION_TRENDING_NOW",
+        "popular": "ETSY_SECTION_POPULAR",
+        "new_drops": "ETSY_SECTION_NEW_DROPS",
+        "under_5": "ETSY_SECTION_UNDER_5",
+    }
+    sections: Dict[str, int] = {}
+    for key, env_var in section_map.items():
+        raw = os.getenv(env_var)
+        if raw:
+            try:
+                sections[key] = int(raw)
+            except ValueError:
+                logger.warning(
+                    "Environment variable '%s' has non-integer value '%s', skipping",
+                    env_var, raw,
+                )
+    return sections
+
+
 # ---------------------------------------------------------------------------
 # Configuration dataclasses
 # ---------------------------------------------------------------------------
@@ -85,7 +107,9 @@ class OpenAIConfig:
 @dataclass(frozen=True)
 class ReplicateConfig:
     api_token: str
-    model_version: str
+    model_id: str = "black-forest-labs/flux-schnell"
+    model_version: str = ""
+    image_size: int = 1024
 
 
 @dataclass(frozen=True)
@@ -114,6 +138,9 @@ class EtsyConfig:
     api_key: str
     api_secret: str
     shop_id: str
+    taxonomy_id: Optional[int] = None
+    shipping_profile_id: Optional[int] = None
+    shop_sections: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -177,7 +204,9 @@ def load_config(require_all: bool = True) -> AppConfig:
         ),
         replicate=ReplicateConfig(
             api_token=getter("REPLICATE_API_TOKEN"),
+            model_id=_optional("REPLICATE_MODEL_ID", "black-forest-labs/flux-schnell"),
             model_version=_optional("REPLICATE_MODEL_VERSION", ""),
+            image_size=_optional_int("REPLICATE_IMAGE_SIZE", 1024),
         ),
         supabase=SupabaseConfig(
             url=getter("SUPABASE_URL"),
@@ -198,6 +227,9 @@ def load_config(require_all: bool = True) -> AppConfig:
             api_key=getter("ETSY_API_KEY"),
             api_secret=getter("ETSY_API_SECRET"),
             shop_id=getter("ETSY_SHOP_ID"),
+            taxonomy_id=_optional_int("ETSY_TAXONOMY_ID", 0) or None,
+            shipping_profile_id=_optional_int("ETSY_SHIPPING_PROFILE_ID", 0) or None,
+            shop_sections=_load_shop_sections(),
         ),
         reddit=RedditConfig(
             client_id=getter("REDDIT_CLIENT_ID"),

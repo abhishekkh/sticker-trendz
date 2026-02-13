@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
@@ -18,8 +19,20 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Validation thresholds
-EXPECTED_DIMENSION = 1024
+# Validation thresholds – image size matches REPLICATE_IMAGE_SIZE env var
+def _load_expected_dimension() -> int:
+    raw = os.getenv("REPLICATE_IMAGE_SIZE")
+    if raw is None:
+        return 1024
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning(
+            "REPLICATE_IMAGE_SIZE has non-integer value '%s', using default 1024", raw,
+        )
+        return 1024
+
+EXPECTED_DIMENSION = _load_expected_dimension()
 MIN_FILE_SIZE_BYTES = 50 * 1024       # 50 KB
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 MAX_BLANK_RATIO = 0.80                 # 80% white/transparent
