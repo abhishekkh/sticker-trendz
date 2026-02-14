@@ -173,8 +173,9 @@ class SupabaseClient:
         filters: Optional[Dict[str, Any]] = None,
         order_by: Optional[str] = None,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Select rows from a table with optional filters, ordering, and limit."""
+        """Select rows from a table with optional filters, ordering, limit, and offset."""
         if filters:
             _validate_filter_columns(table, filters)
         try:
@@ -186,7 +187,9 @@ class SupabaseClient:
                 desc = order_by.startswith("-")
                 col = order_by.lstrip("-")
                 query = query.order(col, desc=desc)
-            if limit:
+            if offset is not None and limit is not None:
+                query = query.range(offset, offset + limit - 1)
+            elif limit:
                 query = query.limit(limit)
             result = query.execute()
             return result.data or []

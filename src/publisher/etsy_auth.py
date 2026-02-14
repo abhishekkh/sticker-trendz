@@ -138,13 +138,31 @@ class EtsyAuthManager:
                 datetime.now(timezone.utc) + timedelta(seconds=expires_in)
             ).isoformat()
 
-            # Store new tokens in Supabase
+            # Conditional update: only write if our refresh_token is still current.
+            # If another concurrent process already refreshed the token, this will
+            # update 0 rows. In that case, re-read and return the already-refreshed token.
             try:
-                self._db.update_etsy_token(shop_id, {
-                    "access_token": new_access_token,
-                    "refresh_token": new_refresh_token,
-                    "expires_at": new_expires_at,
-                })
+                updated = self._db.update(
+                    "etsy_tokens",
+                    {"shop_id": shop_id, "refresh_token": refresh_token},
+                    {
+                        "access_token": new_access_token,
+                        "refresh_token": new_refresh_token,
+                        "expires_at": new_expires_at,
+                    },
+                )
+                if not updated:
+                    logger.info(
+                        "Etsy token for shop %s was already refreshed by another process; "
+                        "re-reading from DB",
+                        shop_id,
+                    )
+                    current = self._db.get_etsy_token(shop_id)
+                    if current and current.get("access_token"):
+                        return current["access_token"]
+                    raise OAuthError(
+                        f"Concurrent refresh detected for shop {shop_id} but re-read returned no token"
+                    )
                 logger.info(
                     "Etsy token refreshed for shop %s, expires at %s",
                     shop_id, new_expires_at,

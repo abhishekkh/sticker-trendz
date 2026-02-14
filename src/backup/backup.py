@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 WORKFLOW_NAME = "db_backup"
 BACKUP_PREFIX = "backups/db/"
 BACKUP_RETENTION_DAYS = 30
+EXPORT_PAGE_SIZE = 1_000  # rows per page when exporting large tables
 
 # Tables to back up
 BACKUP_TABLES = [
@@ -181,7 +182,7 @@ class DatabaseBackup:
 
         for table_name in BACKUP_TABLES:
             try:
-                rows = self._db.select(table_name)
+                rows = self._export_table_paginated(table_name)
                 export["tables"][table_name] = rows
                 logger.info("Exported %d rows from '%s'", len(rows), table_name)
             except DatabaseError as exc:
@@ -191,6 +192,36 @@ class DatabaseBackup:
         total_rows = sum(len(rows) for rows in export["tables"].values())
         logger.info("Total rows exported: %d across %d tables", total_rows, len(BACKUP_TABLES))
         return export
+
+    def _export_table_paginated(self, table_name: str) -> List[Dict[str, Any]]:
+        """
+        Fetch all rows from a table using page-based pagination.
+
+        Avoids loading millions of rows into memory at once by fetching
+        EXPORT_PAGE_SIZE rows per request.
+
+        Args:
+            table_name: The Supabase table to export.
+
+        Returns:
+            All rows as a flat list.
+        """
+        all_rows: List[Dict[str, Any]] = []
+        offset = 0
+
+        while True:
+            page = self._db.select(
+                table_name,
+                order_by="id",
+                limit=EXPORT_PAGE_SIZE,
+                offset=offset,
+            )
+            all_rows.extend(page)
+            if len(page) < EXPORT_PAGE_SIZE:
+                break
+            offset += EXPORT_PAGE_SIZE
+
+        return all_rows
 
     def _cleanup_old_backups(self) -> int:
         """

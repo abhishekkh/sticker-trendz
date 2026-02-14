@@ -148,17 +148,18 @@ class TrendScorer:
         if not self._client:
             cfg = load_config(require_all=False)
             api_key = openai_api_key or cfg.openai.api_key
-            self._model = model or cfg.openai.scoring_model or "gpt-4o-mini"
+            self._model = model or cfg.openai.scoring_model
 
             try:
                 from openai import OpenAI
-                self._client = OpenAI(api_key=api_key)
-                logger.info("OpenAI client initialized for scoring")
+                base_url = cfg.openai.base_url or None
+                self._client = OpenAI(api_key=api_key, base_url=base_url)
+                logger.info("LLM client initialized for scoring")
             except Exception as exc:
-                logger.error("Failed to initialize OpenAI client: %s", exc)
+                logger.error("Failed to initialize LLM client: %s", exc)
                 self._client = None
         else:
-            self._model = model or "gpt-4o-mini"
+            self._model = model or "gemini-2.0-flash"
 
     def score_trend(
         self,

@@ -8,8 +8,9 @@ Also provides Redis-based concurrency locks for workflow deduplication.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 from src.config import load_config
 
@@ -65,6 +66,8 @@ class EtsyRateLimiter:
             redis_token: Upstash Redis token. Falls back to config.
             redis_client: Pre-built Redis client (for testing).
         """
+        self._lock_tokens: Dict[str, str] = {}
+
         if redis_client is not None:
             self._redis = redis_client
             return
@@ -218,10 +221,12 @@ class EtsyRateLimiter:
         """
         lock_key = f"lock:{workflow_name}"
         lock_ttl = ttl or LOCK_TTLS.get(workflow_name, 30 * 60)
+        token = str(uuid.uuid4())
 
         try:
-            acquired = self._redis.set(lock_key, "1", nx=True, ex=lock_ttl)
+            acquired = self._redis.set(lock_key, token, nx=True, ex=lock_ttl)
             if acquired:
+                self._lock_tokens[workflow_name] = token
                 logger.info(
                     "Acquired lock for '%s' (TTL=%ds)", workflow_name, lock_ttl
                 )
@@ -235,19 +240,47 @@ class EtsyRateLimiter:
 
     def release_lock(self, workflow_name: str) -> bool:
         """
-        Release a concurrency lock.
+        Release a concurrency lock, only if this instance owns it.
+
+        Uses a Lua script for an atomic check-and-delete to prevent
+        releasing a lock owned by another process.
 
         Args:
             workflow_name: The workflow whose lock to release.
 
         Returns:
-            True if the lock was released, False on error.
+            True if the lock was released, False if not owned or on error.
         """
         lock_key = f"lock:{workflow_name}"
+        token = self._lock_tokens.get(workflow_name)
+        if not token:
+            logger.warning(
+                "No lock token found for '%s'; lock was never acquired by this instance",
+                workflow_name,
+            )
+            return False
+
+        # Lua script: delete the key only if its value matches our token
+        lua_script = """
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+            return redis.call("del", KEYS[1])
+        else
+            return 0
+        end
+        """
         try:
-            self._redis.delete(lock_key)
-            logger.info("Released lock for '%s'", workflow_name)
-            return True
+            released = self._redis.eval(lua_script, 1, lock_key, token)
+            if released:
+                del self._lock_tokens[workflow_name]
+                logger.info("Released lock for '%s'", workflow_name)
+                return True
+            else:
+                logger.warning(
+                    "Lock for '%s' was not owned by this instance (already expired or stolen)",
+                    workflow_name,
+                )
+                self._lock_tokens.pop(workflow_name, None)
+                return False
         except Exception as exc:
             logger.error("Failed to release lock for '%s': %s", workflow_name, exc)
             return False

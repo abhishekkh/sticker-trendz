@@ -139,19 +139,45 @@ class TestRedisLock:
         assert result is False
 
     def test_release_lock_deletes_key(self):
-        """release_lock deletes the lock key."""
+        """release_lock uses Lua check-and-delete and returns True when this instance owns the lock."""
         redis = MagicMock()
-        redis.delete.return_value = 1
+        redis.set.return_value = True   # acquire succeeds
+        redis.eval.return_value = 1     # Lua script: key deleted
         limiter = EtsyRateLimiter(redis_client=redis)
+        # Acquire first so _lock_tokens is populated
+        limiter.acquire_lock("trend_monitor")
         result = limiter.release_lock("trend_monitor")
         assert result is True
-        redis.delete.assert_called_once_with("lock:trend_monitor")
+        redis.eval.assert_called_once()
+        call_args = redis.eval.call_args[0]
+        assert call_args[2] == "lock:trend_monitor"  # KEYS[1]
+
+    def test_release_lock_returns_false_when_not_owned(self):
+        """release_lock returns False when we never acquired the lock."""
+        redis = MagicMock()
+        limiter = EtsyRateLimiter(redis_client=redis)
+        # Do NOT acquire; no token stored
+        result = limiter.release_lock("pricing_engine")
+        assert result is False
+        redis.eval.assert_not_called()
+
+    def test_release_lock_returns_false_when_lock_stolen(self):
+        """release_lock returns False when the Lua script finds a different owner."""
+        redis = MagicMock()
+        redis.set.return_value = True   # acquire succeeds
+        redis.eval.return_value = 0     # Lua: token mismatch, not deleted
+        limiter = EtsyRateLimiter(redis_client=redis)
+        limiter.acquire_lock("trend_monitor")
+        result = limiter.release_lock("trend_monitor")
+        assert result is False
 
     def test_release_lock_handles_redis_error(self):
-        """release_lock returns False on Redis error."""
+        """release_lock returns False on Redis error during eval."""
         redis = MagicMock()
-        redis.delete.side_effect = Exception("Connection refused")
+        redis.set.return_value = True
+        redis.eval.side_effect = Exception("Connection refused")
         limiter = EtsyRateLimiter(redis_client=redis)
+        limiter.acquire_lock("pricing_engine")
         result = limiter.release_lock("pricing_engine")
         assert result is False
 

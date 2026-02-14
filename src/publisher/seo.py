@@ -115,14 +115,15 @@ class SEOGenerator:
         if not self._client:
             cfg = load_config(require_all=False)
             api_key = openai_api_key or cfg.openai.api_key
-            self._model = model or cfg.openai.seo_model or "gpt-4o-mini"
+            self._model = model or cfg.openai.seo_model
             try:
                 from openai import OpenAI
-                self._client = OpenAI(api_key=api_key)
+                base_url = cfg.openai.base_url or None
+                self._client = OpenAI(api_key=api_key, base_url=base_url)
             except Exception as exc:
                 logger.error("Failed to initialize OpenAI client: %s", exc)
         else:
-            self._model = model or "gpt-4o-mini"
+            self._model = model or "gemini-2.0-flash"
 
     def generate_title(self, trend_topic: str, style: str = "vinyl sticker") -> str:
         """

@@ -75,12 +75,14 @@ class ContentModerator:
 
         if not self._client:
             cfg = load_config(require_all=False)
-            api_key = openai_api_key or cfg.openai.api_key
-            try:
-                from openai import OpenAI
-                self._client = OpenAI(api_key=api_key)
-            except Exception as exc:
-                logger.error("Failed to initialize OpenAI client: %s", exc)
+            api_key = openai_api_key or cfg.openai.moderation_api_key
+            if api_key:
+                try:
+                    from openai import OpenAI
+                    self._client = OpenAI(api_key=api_key)
+                except Exception as exc:
+                    logger.error("Failed to initialize OpenAI client for moderation: %s", exc)
+            # If no OpenAI key, self._client stays None → flags for manual review
 
     def moderate_image(
         self,

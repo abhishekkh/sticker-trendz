@@ -7,7 +7,10 @@ import pytest
 from src.monitoring.spend_tracker import (
     SpendTracker,
     estimate_openai_cost,
+    estimate_llm_cost,
     estimate_replicate_cost,
+    LLM_INPUT_COST_PER_TOKEN,
+    LLM_OUTPUT_COST_PER_TOKEN,
     GPT4O_MINI_INPUT_COST_PER_TOKEN,
     GPT4O_MINI_OUTPUT_COST_PER_TOKEN,
     REPLICATE_COST_PER_IMAGE,
@@ -21,30 +24,37 @@ from src.db import DatabaseError
 class TestEstimateFunctions:
     """Tests for the standalone cost estimation functions."""
 
-    def test_estimate_openai_cost_calculates_correctly(self):
-        """OpenAI cost should be calculated using GPT-4o-mini pricing."""
-        input_tokens = 1_000_000  # 1M tokens
-        output_tokens = 1_000_000  # 1M tokens
+    def test_estimate_llm_cost_defaults_to_zero(self):
+        """Default LLM cost should be 0.0 (Gemini Flash free tier)."""
+        assert LLM_INPUT_COST_PER_TOKEN == 0.0
+        assert LLM_OUTPUT_COST_PER_TOKEN == 0.0
 
-        cost = estimate_openai_cost(input_tokens, output_tokens)
+        cost = estimate_llm_cost(1_000_000, 1_000_000)
+        assert cost == 0.0
 
-        # $0.15 for 1M input + $0.60 for 1M output = $0.75
-        assert cost == 0.75
+    def test_estimate_openai_cost_is_alias(self):
+        """estimate_openai_cost should be an alias for estimate_llm_cost."""
+        assert estimate_openai_cost is estimate_llm_cost
 
-    def test_estimate_openai_cost_with_small_values(self):
-        """Cost estimation should work for small token counts."""
+    def test_estimate_llm_cost_uses_configured_rates(self):
+        """Cost estimation should use LLM_INPUT/OUTPUT_COST_PER_TOKEN constants."""
         input_tokens = 100
         output_tokens = 200
 
-        cost = estimate_openai_cost(input_tokens, output_tokens)
+        cost = estimate_llm_cost(input_tokens, output_tokens)
 
-        expected = 100 * GPT4O_MINI_INPUT_COST_PER_TOKEN + 200 * GPT4O_MINI_OUTPUT_COST_PER_TOKEN
+        expected = 100 * LLM_INPUT_COST_PER_TOKEN + 200 * LLM_OUTPUT_COST_PER_TOKEN
         assert cost == round(expected, 6)
 
-    def test_estimate_openai_cost_with_zero_tokens(self):
+    def test_estimate_llm_cost_with_zero_tokens(self):
         """Cost should be zero when no tokens are used."""
-        cost = estimate_openai_cost(0, 0)
+        cost = estimate_llm_cost(0, 0)
         assert cost == 0.0
+
+    def test_backward_compat_aliases(self):
+        """GPT4O_MINI_* constants should match LLM_* constants."""
+        assert GPT4O_MINI_INPUT_COST_PER_TOKEN == LLM_INPUT_COST_PER_TOKEN
+        assert GPT4O_MINI_OUTPUT_COST_PER_TOKEN == LLM_OUTPUT_COST_PER_TOKEN
 
     def test_estimate_replicate_cost_calculates_correctly(self):
         """Replicate cost should use REPLICATE_COST_PER_IMAGE per image."""

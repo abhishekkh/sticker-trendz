@@ -20,7 +20,9 @@ pytestmark = [pytest.mark.integration, skip_if_no_supabase]
 @pytest.fixture
 def db():
     from src.db import SupabaseClient
-    return SupabaseClient()
+    from src.config import load_config
+    cfg = load_config(require_all=False)
+    return SupabaseClient(url=cfg.supabase.url, key=cfg.supabase.service_key)
 
 
 @pytest.fixture
@@ -44,7 +46,7 @@ class TestTrendsCRUD:
         data = {
             "topic": f"[{prefix}] Cute Robot",
             "topic_normalized": f"{prefix.lower()}-cute-robot",
-            "source": "reddit",
+            "sources": ["reddit"],
             "keywords": ["robot", "cute"],
             "status": "discovered",
             "score_overall": 75.0,
@@ -61,7 +63,7 @@ class TestTrendsCRUD:
         db.insert_trend({
             "topic": f"[{prefix}] Test Lookup",
             "topic_normalized": normalized,
-            "source": "google_trends",
+            "sources": ["google_trends"],
             "keywords": ["test"],
             "status": "discovered",
             "score_overall": 50.0,
@@ -75,7 +77,7 @@ class TestTrendsCRUD:
         result = db.insert_trend({
             "topic": f"[{prefix}] Update Me",
             "topic_normalized": f"{prefix.lower()}-update-me",
-            "source": "reddit",
+            "sources": ["reddit"],
             "keywords": [],
             "status": "discovered",
             "score_overall": 60.0,
@@ -95,7 +97,7 @@ class TestStickersCRUD:
         trend = db.insert_trend({
             "topic": f"[{prefix}] Sticker Trend",
             "topic_normalized": f"{prefix.lower()}-sticker-trend",
-            "source": "reddit",
+            "sources": ["reddit"],
             "keywords": [],
             "status": "generated",
             "score_overall": 80.0,

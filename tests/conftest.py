@@ -43,6 +43,10 @@ def has_supabase_creds() -> bool:
     return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"))
 
 
+def has_redis_creds() -> bool:
+    return bool(os.getenv("UPSTASH_REDIS_URL") and os.getenv("UPSTASH_REDIS_TOKEN"))
+
+
 def has_r2_creds() -> bool:
     return bool(
         os.getenv("CLOUDFLARE_R2_ACCESS_KEY")
@@ -67,6 +71,9 @@ skip_if_no_etsy = pytest.mark.skipif(
 )
 skip_if_no_supabase = pytest.mark.skipif(
     not has_supabase_creds(), reason="Missing SUPABASE_URL / SUPABASE_SERVICE_KEY"
+)
+skip_if_no_redis = pytest.mark.skipif(
+    not has_redis_creds(), reason="Missing UPSTASH_REDIS_URL / UPSTASH_REDIS_TOKEN"
 )
 skip_if_no_r2 = pytest.mark.skipif(
     not has_r2_creds(),

@@ -17,9 +17,28 @@ from src.monitoring.alerter import EmailAlerter
 
 logger = logging.getLogger(__name__)
 
-# GPT-4o-mini pricing (per the spec)
-GPT4O_MINI_INPUT_COST_PER_TOKEN: float = 0.15 / 1_000_000   # $0.15 per 1M input tokens
-GPT4O_MINI_OUTPUT_COST_PER_TOKEN: float = 0.60 / 1_000_000  # $0.60 per 1M output tokens
+# LLM per-token costs – configurable via env vars.
+# Default to 0.0 for Gemini Flash free tier; set LLM_INPUT_COST_PER_TOKEN
+# and LLM_OUTPUT_COST_PER_TOKEN if using a paid model (e.g. GPT-4o-mini).
+def _load_llm_cost(env_var: str, default: float) -> float:
+    raw = os.getenv(env_var)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning(
+            "%s has non-numeric value '%s', using default %f", env_var, raw, default,
+        )
+        return default
+
+
+LLM_INPUT_COST_PER_TOKEN: float = _load_llm_cost("LLM_INPUT_COST_PER_TOKEN", 0.0)
+LLM_OUTPUT_COST_PER_TOKEN: float = _load_llm_cost("LLM_OUTPUT_COST_PER_TOKEN", 0.0)
+
+# Backward-compat aliases (tests/callers that import the old names)
+GPT4O_MINI_INPUT_COST_PER_TOKEN: float = LLM_INPUT_COST_PER_TOKEN
+GPT4O_MINI_OUTPUT_COST_PER_TOKEN: float = LLM_OUTPUT_COST_PER_TOKEN
 
 # Replicate cost per image – configurable via env var (default: FLUX Schnell ~$0.003)
 def _load_replicate_cost() -> float:
@@ -42,9 +61,12 @@ MONTHLY_HARD_STOP_USD: float = 150.0
 DAILY_WARNING_USD: float = 8.0
 
 
-def estimate_openai_cost(input_tokens: int, output_tokens: int) -> float:
+def estimate_llm_cost(input_tokens: int, output_tokens: int) -> float:
     """
-    Estimate OpenAI API cost for a GPT-4o-mini request.
+    Estimate LLM API cost based on configured per-token rates.
+
+    Defaults to 0.0 (Gemini Flash free tier). Override via
+    LLM_INPUT_COST_PER_TOKEN / LLM_OUTPUT_COST_PER_TOKEN env vars.
 
     Args:
         input_tokens: Number of input tokens.
@@ -54,10 +76,14 @@ def estimate_openai_cost(input_tokens: int, output_tokens: int) -> float:
         Estimated cost in USD.
     """
     return round(
-        input_tokens * GPT4O_MINI_INPUT_COST_PER_TOKEN
-        + output_tokens * GPT4O_MINI_OUTPUT_COST_PER_TOKEN,
+        input_tokens * LLM_INPUT_COST_PER_TOKEN
+        + output_tokens * LLM_OUTPUT_COST_PER_TOKEN,
         6,
     )
+
+
+# Backward-compat alias
+estimate_openai_cost = estimate_llm_cost
 
 
 def estimate_replicate_cost(image_count: int) -> float:

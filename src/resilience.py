@@ -33,18 +33,40 @@ DEFAULT_THRESHOLDS: Dict[str, int] = {
 
 @dataclass
 class CircuitBreakerState:
-    """Tracks consecutive failures for a single service."""
+    """
+    Tracks consecutive failures for a single service.
+
+    States:
+      - Closed:    Normal operation. Failures accumulate toward threshold.
+      - Open:      All calls blocked. After reset_timeout seconds, moves to half-open.
+      - Half-open: One probe call is allowed. Success closes the circuit;
+                   failure resets the open timer and stays open.
+    """
 
     service: str
     threshold: int
+    reset_timeout: float = 60.0  # seconds before trying a probe (half-open)
     consecutive_failures: int = 0
     is_open: bool = False
+    _opened_at: Optional[float] = field(default=None, repr=False)
+    _probe_in_flight: bool = field(default=False, repr=False)
 
     def record_failure(self) -> bool:
         """Record a failure. Returns True if the circuit just tripped open."""
+        if self.is_open:
+            # Probe failed -- reset the open timer, stay open
+            self._opened_at = time.monotonic()
+            self._probe_in_flight = False
+            logger.warning(
+                "Circuit breaker probe FAILED for '%s'; staying open", self.service
+            )
+            return False
+
         self.consecutive_failures += 1
-        if self.consecutive_failures >= self.threshold and not self.is_open:
+        if self.consecutive_failures >= self.threshold:
             self.is_open = True
+            self._opened_at = time.monotonic()
+            self._probe_in_flight = False
             logger.warning(
                 "Circuit breaker OPEN for service '%s' after %d consecutive failures",
                 self.service,
@@ -54,18 +76,46 @@ class CircuitBreakerState:
         return False
 
     def record_success(self) -> None:
-        """Record a success, resetting the failure counter."""
-        if self.consecutive_failures > 0:
+        """Record a success, resetting the failure counter and closing the circuit."""
+        if self.is_open:
+            logger.info(
+                "Circuit breaker CLOSED for service '%s' after successful probe",
+                self.service,
+            )
+        elif self.consecutive_failures > 0:
             logger.debug(
                 "Circuit breaker reset for service '%s' after success",
                 self.service,
             )
         self.consecutive_failures = 0
         self.is_open = False
+        self._opened_at = None
+        self._probe_in_flight = False
 
     def can_proceed(self) -> bool:
-        """Return True if the circuit is closed (calls allowed)."""
-        return not self.is_open
+        """
+        Return True if a call should be allowed through.
+
+        - Closed: always True.
+        - Open + timeout elapsed + no probe in flight: True (half-open probe).
+        - Open otherwise: False.
+        """
+        if not self.is_open:
+            return True
+
+        # Check whether the reset timeout has elapsed
+        if self._opened_at is not None:
+            elapsed = time.monotonic() - self._opened_at
+            if elapsed >= self.reset_timeout and not self._probe_in_flight:
+                logger.info(
+                    "Circuit breaker HALF-OPEN for '%s' (%.0fs elapsed); allowing probe",
+                    self.service,
+                    elapsed,
+                )
+                self._probe_in_flight = True
+                return True
+
+        return False
 
 
 class CircuitBreakerRegistry:

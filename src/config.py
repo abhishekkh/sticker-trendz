@@ -99,9 +99,11 @@ def _load_shop_sections() -> Dict[str, int]:
 @dataclass(frozen=True)
 class OpenAIConfig:
     api_key: str
-    scoring_model: str = "gpt-4o-mini"
-    prompt_model: str = "gpt-4o-mini"
-    seo_model: str = "gpt-4o-mini"
+    base_url: str = ""
+    scoring_model: str = "gemini-2.0-flash"
+    prompt_model: str = "gemini-2.0-flash"
+    seo_model: str = "gemini-2.0-flash"
+    moderation_api_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -198,9 +200,31 @@ def load_config(require_all: bool = True) -> AppConfig:
     """
     getter = _require if require_all else lambda name: _optional(name, "")
 
+    # Auto-detect LLM provider: prefer GEMINI_API_KEY, fall back to OPENAI_API_KEY
+    gemini_key = _optional("GEMINI_API_KEY", "")
+    openai_key = (
+        getter("OPENAI_API_KEY")
+        if require_all and not gemini_key
+        else _optional("OPENAI_API_KEY", "")
+    )
+
+    if gemini_key:
+        llm_api_key = gemini_key
+        default_base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        default_model = "gemini-2.0-flash"
+    else:
+        llm_api_key = openai_key
+        default_base_url = ""
+        default_model = "gpt-4o-mini"
+
     return AppConfig(
         openai=OpenAIConfig(
-            api_key=getter("OPENAI_API_KEY"),
+            api_key=llm_api_key,
+            base_url=_optional("LLM_BASE_URL", default_base_url),
+            scoring_model=_optional("LLM_SCORING_MODEL", default_model),
+            prompt_model=_optional("LLM_PROMPT_MODEL", default_model),
+            seo_model=_optional("LLM_SEO_MODEL", default_model),
+            moderation_api_key=openai_key,
         ),
         replicate=ReplicateConfig(
             api_token=getter("REPLICATE_API_TOKEN"),
