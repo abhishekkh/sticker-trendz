@@ -53,7 +53,7 @@ class TestLoadConfig:
             "ETSY_SHOP_ID": "12345",
             "REDDIT_USER_AGENT": "test-agent/1.0",
             "STICKER_MULE_API_KEY": "sm-key",
-            "SENDGRID_API_KEY": "sg-key",
+            "RESEND_API_KEY": "re_test_key",
             "ALERT_EMAIL": "alerts@example.com",
             "MAX_TRENDS_PER_CYCLE": "10",
             "MAX_IMAGES_PER_DAY": "25",
@@ -123,7 +123,7 @@ class TestLoadConfig:
             "ETSY_API_SECRET": "etsy-secret",
             "ETSY_SHOP_ID": "12345",
             "STICKER_MULE_API_KEY": "sm-key",
-            "SENDGRID_API_KEY": "sg-key",
+            "RESEND_API_KEY": "re_test_key",
             "ALERT_EMAIL": "alerts@example.com",
         }
         with patch.dict(os.environ, env, clear=True):
@@ -169,7 +169,7 @@ class TestLoadConfig:
             "ETSY_API_SECRET": "etsy-secret",
             "ETSY_SHOP_ID": "12345",
             "STICKER_MULE_API_KEY": "sm-key",
-            "SENDGRID_API_KEY": "sg-key",
+            "RESEND_API_KEY": "re_test_key",
             "ALERT_EMAIL": "alerts@example.com",
         }
         with patch.dict(os.environ, env, clear=True):

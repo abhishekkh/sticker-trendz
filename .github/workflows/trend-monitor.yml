@@ -37,7 +37,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
           UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           MAX_TRENDS_PER_CYCLE: ${{ vars.MAX_TRENDS_PER_CYCLE || '5' }}
 
@@ -71,7 +71,7 @@ jobs:
           CLOUDFLARE_R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
           UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
           UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           MAX_IMAGES_PER_DAY: ${{ vars.MAX_IMAGES_PER_DAY || '50' }}
           MAX_ACTIVE_LISTINGS: ${{ vars.MAX_ACTIVE_LISTINGS || '300' }}

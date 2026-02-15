@@ -18,7 +18,7 @@ Pillow==11.1.0
 pytrends==4.9.2
 
 # Email
-sendgrid==6.11.0
+resend==2.7.0
 
 # HTTP
 httpx==0.28.1

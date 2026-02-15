@@ -45,7 +45,7 @@ An automated platform that monitors social media for trending topics, generates 
 │                    EXTERNAL INTEGRATIONS                        │
 ├─────────────────────────────────────────────────────────────────┤
 │  Social APIs  │  AI Models  │  Payment  │  Email/SMS           │
-│  (Twitter, IG)│  (OpenAI,   │ (Stripe)  │  (SendGrid)          │
+│  (Twitter, IG)│  (OpenAI,   │ (Stripe)  │  (Resend)          │
 │               │   Midjourney)│           │                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -350,7 +350,7 @@ An automated platform that monitors social media for trending topics, generates 
 | Shopify storefront | $39 |
 | Basic AWS (single small instance + S3) | $50-100 |
 | Print-on-demand (Sticker Mule / Printful) | Per-order pass-through (~$1-3/sticker) |
-| SendGrid (email) | $0 (free tier) |
+| Resend (email) | $0 (free tier) |
 | Domain + SSL | ~$5 |
 | **Total Fixed Monthly** | **$200-400** |
 
@@ -424,7 +424,7 @@ An automated platform that monitors social media for trending topics, generates 
 | Elasticsearch (managed) | $100-200 |
 | SQS / Load Balancer / misc | $30-50 |
 | Stripe | 2.9% + $0.30/transaction |
-| SendGrid (email drops) | $20-50 |
+| Resend (email drops) | $20-50 |
 | Monitoring (Datadog or Grafana) | $50-100 |
 | Print-on-demand | Per-order pass-through |
 | **Total Fixed Monthly** | **$1,200-2,300** |
@@ -520,7 +520,7 @@ Trend Detected
 | ClickHouse or BigQuery (analytics) | $100-300 |
 | Datadog monitoring | $100-300 |
 | Stripe | 2.9% + $0.30/transaction |
-| SendGrid (high volume email) | $50-100 |
+| Resend (high volume email) | $50-100 |
 | **Total Fixed Monthly** | **$8,000-12,500** |
 
 #### Discovery & Marketing

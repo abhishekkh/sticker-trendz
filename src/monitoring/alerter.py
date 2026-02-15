@@ -1,5 +1,5 @@
 """
-Email alerter for Sticker Trendz using SendGrid.
+Email alerter for Sticker Trendz using Resend.
 
 Sends critical alerts, warning alerts, daily summary emails, and
 moderation review alerts. Email content never includes PII.
@@ -22,7 +22,7 @@ class AlerterError(Exception):
 
 class EmailAlerter:
     """
-    SendGrid-based email alerter for operational notifications.
+    Resend-based email alerter for operational notifications.
 
     Supports:
       - Critical alerts (OAuth failure, all APIs down, DB down)
@@ -36,27 +36,27 @@ class EmailAlerter:
 
     def __init__(
         self,
-        sendgrid_api_key: Optional[str] = None,
+        resend_api_key: Optional[str] = None,
         alert_email: Optional[str] = None,
-        from_email: str = "noreply@sticker-trendz.com",
+        from_email: str = "onboarding@resend.dev",
         _send_fn: Optional[Any] = None,
     ) -> None:
         """
         Args:
-            sendgrid_api_key: SendGrid API key. Falls back to config.
+            resend_api_key: Resend API key. Falls back to config.
             alert_email: Recipient for alerts. Falls back to config.
             from_email: Sender address.
             _send_fn: Injectable send function for testing.
         """
         cfg = load_config(require_all=False)
-        self._api_key = sendgrid_api_key or cfg.notification.sendgrid_api_key
+        self._api_key = resend_api_key or cfg.notification.resend_api_key
         self._alert_email = alert_email or cfg.notification.alert_email
         self._from_email = from_email
         self._send_fn = _send_fn
 
     def _send_email(self, subject: str, body: str) -> None:
         """
-        Send an email via SendGrid.
+        Send an email via Resend.
 
         If a custom _send_fn was injected (testing), use that instead.
         """
@@ -65,27 +65,22 @@ class EmailAlerter:
             return
 
         try:
-            from sendgrid import SendGridAPIClient
-            from sendgrid.helpers.mail import Mail
+            import resend
 
-            message = Mail(
-                from_email=self._from_email,
-                to_emails=self._alert_email,
-                subject=subject,
-                plain_text_content=body,
-            )
-            sg = SendGridAPIClient(self._api_key)
-            response = sg.send(message)
-            logger.info(
-                "Email sent: subject='%s', status=%s",
-                subject, response.status_code,
-            )
+            resend.api_key = self._api_key
+            resend.Emails.send({
+                "from": self._from_email,
+                "to": [self._alert_email],
+                "subject": subject,
+                "text": body,
+            })
+            logger.info("Email sent: subject='%s'", subject)
         except Exception as exc:
             logger.error(
-                "Failed to send email via SendGrid: %s (subject='%s')",
+                "Failed to send email via Resend: %s (subject='%s')",
                 exc, subject,
             )
-            raise AlerterError(f"SendGrid send failed: {exc}") from exc
+            raise AlerterError(f"Resend send failed: {exc}") from exc
 
     def send_alert(
         self, subject: str, body: str, level: str = "critical"

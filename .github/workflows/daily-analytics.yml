@@ -37,7 +37,7 @@ jobs:
           UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
           STICKER_MULE_API_KEY: ${{ secrets.STICKER_MULE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
       - name: Database backup
         continue-on-error: true
@@ -49,5 +49,5 @@ jobs:
           CLOUDFLARE_R2_SECRET_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}
           CLOUDFLARE_R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
           CLOUDFLARE_R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}

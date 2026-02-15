@@ -157,7 +157,7 @@ class FulfillmentConfig:
 
 @dataclass(frozen=True)
 class NotificationConfig:
-    sendgrid_api_key: str
+    resend_api_key: str
     alert_email: str
 
 
@@ -260,7 +260,7 @@ def load_config(require_all: bool = True) -> AppConfig:
             sticker_mule_api_key=getter("STICKER_MULE_API_KEY"),
         ),
         notification=NotificationConfig(
-            sendgrid_api_key=getter("SENDGRID_API_KEY"),
+            resend_api_key=getter("RESEND_API_KEY"),
             alert_email=getter("ALERT_EMAIL"),
         ),
         caps=CapsConfig(

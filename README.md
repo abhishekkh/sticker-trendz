@@ -14,7 +14,7 @@ Add these under **Settings → Secrets and variables → Actions → Secrets**:
 | `SUPABASE_SERVICE_KEY` | Supabase service role key (not the anon key) |
 | `UPSTASH_REDIS_URL` | Upstash Redis REST URL |
 | `UPSTASH_REDIS_TOKEN` | Upstash Redis REST token |
-| `SENDGRID_API_KEY` | SendGrid API key for email alerts |
+| `RESEND_API_KEY` | Resend API key for email alerts |
 | `ALERT_EMAIL` | Email address to receive operational alerts |
 | `ETSY_API_KEY` | Etsy API key (client_id) |
 | `ETSY_API_SECRET` | Etsy API secret (client_secret) |

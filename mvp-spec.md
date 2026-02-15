@@ -78,7 +78,7 @@ GitHub Actions (cron every 2 hours)            GitHub Actions (daily 6AM)
 | AI -- Moderation | OpenAI Moderation API | Free | |
 | Storefront | Etsy | $0.20/listing + 6.5% transaction fee | Max 300 active listings (budget cap). App review required (1-4 weeks). |
 | Fulfillment | Sticker Mule or self-fulfillment (USPS) | Per-order ($1-3/sticker) | Validate Sticker Mule API supports single on-demand orders before launch |
-| Email | SendGrid | Free (100 emails/day) | |
+| Email | Resend | Free (100 emails/day) | |
 | Repo / CI | GitHub | Free | |
 
 **Total fixed monthly cost: $75-200**
@@ -943,7 +943,7 @@ sticker-trendz/
 |   +-- monitoring/
 |   |   +-- pipeline_logger.py     # Log pipeline runs to Supabase
 |   |   +-- error_logger.py        # Log errors to error_log table
-|   |   +-- alerter.py             # SendGrid email alerts
+|   |   +-- alerter.py             # Resend email alerts
 |   +-- backup/
 |   |   +-- db_backup.py           # Daily pg_dump to R2
 |   +-- db.py                      # Supabase client
@@ -1016,7 +1016,7 @@ ETSY_SHOP_ID=
 STICKER_MULE_API_KEY=
 
 # Notifications
-SENDGRID_API_KEY=
+RESEND_API_KEY=
 ALERT_EMAIL=
 
 # Operational Caps
@@ -1168,7 +1168,7 @@ jobs:
           ETSY_SHOP_ID: ${{ secrets.ETSY_SHOP_ID }}
           UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
           UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 ```
 
@@ -1208,7 +1208,7 @@ jobs:
           UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
           UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
           STICKER_MULE_API_KEY: ${{ secrets.STICKER_MULE_API_KEY }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
       - name: Database backup
         run: python -m src.backup.db_backup
@@ -1260,7 +1260,7 @@ After 5 consecutive failures to the same service within a single workflow run, s
 | Image generation fails for 1 of 3 variants | Keep successful variants. Retry failed ones (max 2 retries). |
 | Etsy publishing fails for 1 sticker | Skip it, mark for retry next cycle. Continue publishing others. |
 | All trend sources fail | Log error, send alert, exit non-zero. |
-| Supabase is down | Halt immediately, send alert (via Redis + SendGrid as fallback). |
+| Supabase is down | Halt immediately, send alert (via Redis + Resend as fallback). |
 
 ### Concurrency Locks
 
@@ -1501,7 +1501,7 @@ Every workflow run logs to the `pipeline_runs` table (see Data Models section):
 - Etsy API calls consumed
 - Estimated AI cost
 
-### Daily Summary Email (via SendGrid)
+### Daily Summary Email (via Resend)
 
 Sent after the daily analytics sync (8 AM UTC):
 
@@ -1543,7 +1543,7 @@ Track AI spend per pipeline run:
 
 ### GitHub Actions Monitoring
 
-GitHub natively supports email notifications on workflow failure. Enable this for all workflows. Additionally, if 3+ consecutive runs of the same workflow fail, the error logger sends an alert via SendGrid.
+GitHub natively supports email notifications on workflow failure. Enable this for all workflows. Additionally, if 3+ consecutive runs of the same workflow fail, the error logger sends an alert via Resend.
 
 ---
 
@@ -1559,7 +1559,7 @@ GitHub natively supports email notifications on workflow failure. Enable this fo
 | Etsy API Key/Secret | GitHub Secrets | Annually (or if compromised) |
 | Etsy OAuth Tokens | Supabase `etsy_tokens` table | Auto-rotated hourly |
 | Sticker Mule API Key | GitHub Secrets | Quarterly |
-| SendGrid API Key | GitHub Secrets | Quarterly |
+| Resend API Key | GitHub Secrets | Quarterly |
 | Cloudflare R2 Keys | GitHub Secrets | Quarterly |
 | Upstash Redis Token | GitHub Secrets | Quarterly |
 
@@ -1588,7 +1588,7 @@ ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
 
 - `orders.customer_data` contains PII: customer name, shipping address, email
 - Never log PII in pipeline_runs, error_log, or GitHub Actions output
-- Never include PII in SendGrid emails (use order ID references only)
+- Never include PII in Resend emails (use order ID references only)
 - PII retention: 90 days after order delivery, then purge (see Data Retention section)
 - R2 bucket: public read for sticker images. No directory listing. No write from public.
 - Logs must never contain: API keys, customer data, full API response bodies, Etsy tokens
