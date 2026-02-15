@@ -80,7 +80,7 @@ class PromptGenerator:
                 logger.error("Failed to initialize OpenAI client: %s", exc)
                 self._client = None
         else:
-            self._model = model or "gemini-2.0-flash"
+            self._model = model or "gemini-2.5-flash"
 
     def generate_prompts(
         self,

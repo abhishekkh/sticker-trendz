@@ -123,7 +123,7 @@ class SEOGenerator:
             except Exception as exc:
                 logger.error("Failed to initialize OpenAI client: %s", exc)
         else:
-            self._model = model or "gemini-2.0-flash"
+            self._model = model or "gemini-2.5-flash"
 
     def generate_title(self, trend_topic: str, style: str = "vinyl sticker") -> str:
         """

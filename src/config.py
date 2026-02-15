@@ -100,9 +100,9 @@ def _load_shop_sections() -> Dict[str, int]:
 class OpenAIConfig:
     api_key: str
     base_url: str = ""
-    scoring_model: str = "gemini-2.0-flash"
-    prompt_model: str = "gemini-2.0-flash"
-    seo_model: str = "gemini-2.0-flash"
+    scoring_model: str = "gemini-2.5-flash"
+    prompt_model: str = "gemini-2.5-flash"
+    seo_model: str = "gemini-2.5-flash"
     moderation_api_key: str = ""
 
 
@@ -209,7 +209,7 @@ def load_config(require_all: bool = False) -> AppConfig:
     if gemini_key:
         llm_api_key = gemini_key
         default_base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-        default_model = "gemini-2.0-flash"
+        default_model = "gemini-2.5-flash"
     else:
         llm_api_key = openai_key
         default_base_url = ""

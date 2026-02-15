@@ -92,9 +92,9 @@ class TestLoadConfig:
             config = load_config(require_all=False)
             assert config.openai.api_key == "gem-test"
             assert config.openai.base_url == "https://generativelanguage.googleapis.com/v1beta/openai/"
-            assert config.openai.scoring_model == "gemini-2.0-flash"
-            assert config.openai.prompt_model == "gemini-2.0-flash"
-            assert config.openai.seo_model == "gemini-2.0-flash"
+            assert config.openai.scoring_model == "gemini-2.5-flash"
+            assert config.openai.prompt_model == "gemini-2.5-flash"
+            assert config.openai.seo_model == "gemini-2.5-flash"
             assert config.openai.moderation_api_key == ""
 
     def test_gemini_key_with_openai_key_for_moderation(self):
@@ -104,7 +104,7 @@ class TestLoadConfig:
             config = load_config(require_all=False)
             assert config.openai.api_key == "gem-test"
             assert config.openai.moderation_api_key == "sk-mod"
-            assert config.openai.scoring_model == "gemini-2.0-flash"
+            assert config.openai.scoring_model == "gemini-2.5-flash"
 
     def test_gemini_key_skips_openai_require(self):
         """When GEMINI_API_KEY is set, OPENAI_API_KEY is not required even with require_all=True."""
