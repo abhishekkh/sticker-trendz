@@ -185,7 +185,7 @@ class AppConfig:
     caps: CapsConfig
 
 
-def load_config(require_all: bool = True) -> AppConfig:
+def load_config(require_all: bool = False) -> AppConfig:
     """
     Load and validate all configuration from environment variables.
 
