@@ -104,7 +104,7 @@ class SupabaseClient:
         _key = key
         if not _url or not _key:
             try:
-                cfg = load_config(require_all=True)
+                cfg = load_config()
                 _url = _url or cfg.supabase.url
                 _key = _key or cfg.supabase.service_key
             except ConfigError as exc:
