@@ -71,18 +71,18 @@ class GoogleTrendsSource:
 
         all_trends: List[Dict[str, Any]] = []
 
-        # Fetch trending searches (real-time)
+        # Fetch today's trending searches via the dailytrends endpoint
         try:
             if not self._can_request():
                 logger.info("Google Trends request limit reached for this cycle")
                 return all_trends
 
-            trending_searches = self._pytrends.trending_searches(pn="united_states")
+            today = self._pytrends.today_searches(pn="US")
             self._request_count += 1
 
-            if trending_searches is not None and not trending_searches.empty:
-                for _, row in trending_searches.iterrows():
-                    term = sanitize_external_text(str(row[0]).strip())
+            if today is not None and not today.empty:
+                for term in today:
+                    term = sanitize_external_text(str(term).strip())
                     if not term:
                         continue
                     keywords = extract_keywords(term)
@@ -91,51 +91,18 @@ class GoogleTrendsSource:
                         "keywords": keywords if keywords else [term.lower()],
                         "source": "google_trends",
                         "source_data": {
-                            "type": "trending_search",
+                            "type": "today_search",
                             "term": term,
                         },
                         "score_hint": 0,
                     })
                 logger.info(
-                    "Fetched %d trending searches from Google Trends",
+                    "Fetched %d today's searches from Google Trends",
                     len(all_trends),
                 )
         except Exception as exc:
             logger.error(
-                "Failed to fetch trending searches (graceful degradation): %s",
-                exc,
-            )
-
-        # Fetch realtime trending topics if we have remaining requests
-        try:
-            if self._can_request():
-                realtime = self._pytrends.realtime_trending_searches(pn="US")
-                self._request_count += 1
-
-                if realtime is not None and not realtime.empty:
-                    title_col = "title" if "title" in realtime.columns else realtime.columns[0]
-                    for _, row in realtime.iterrows():
-                        term = sanitize_external_text(str(row.get(title_col, row.iloc[0])).strip())
-                        if not term:
-                            continue
-                        keywords = extract_keywords(term)
-                        all_trends.append({
-                            "topic": term,
-                            "keywords": keywords if keywords else [term.lower()],
-                            "source": "google_trends",
-                            "source_data": {
-                                "type": "realtime_trending",
-                                "term": term,
-                            },
-                            "score_hint": 0,
-                        })
-                    logger.info(
-                        "Fetched realtime trending topics, total now %d",
-                        len(all_trends),
-                    )
-        except Exception as exc:
-            logger.error(
-                "Failed to fetch realtime trends (graceful degradation): %s",
+                "Failed to fetch today's searches (graceful degradation): %s",
                 exc,
             )
 
