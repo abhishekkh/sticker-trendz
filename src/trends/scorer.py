@@ -24,16 +24,15 @@ MAX_JSON_RETRIES = 2
 
 SYSTEM_PROMPT = (
     "You are a trend analyst for a sticker business. "
-    "Score this trend on four dimensions."
+    "Score trends on four dimensions."
 )
 
-USER_PROMPT_TEMPLATE = """Score this trend for sticker commercial viability.
+BATCH_PROMPT_TEMPLATE = """Score each trend below for sticker commercial viability.
 
-Trend: {topic}
-Context: {sample_posts}
-Sources: {source_list}
+{trends_block}
 
-Return a JSON object with these exact fields:
+For each trend return a JSON object with these exact fields:
+- index (integer): the trend number from the list
 - velocity (integer 1-10): how fast is this trend growing
 - commercial (integer 1-10): would 18-35 year olds buy a sticker of this
 - safety (integer 1-10): is it brand-safe and non-controversial
@@ -44,7 +43,9 @@ Return a JSON object with these exact fields:
 Reference calibration:
 - Score 9-10: "Moo Deng baby hippo" (viral, unique, extremely stickerable, brand-safe)
 - Score 6-7: "Taylor Swift Eras Tour" (commercial but trademark-heavy, overdone)
-- Score 3-4: "Federal Reserve rate decision" (not stickerable, no youth appeal)"""
+- Score 3-4: "Federal Reserve rate decision" (not stickerable, no youth appeal)
+
+Return a JSON object with a single key "scores" containing an array of score objects."""
 
 
 @dataclass
@@ -88,9 +89,26 @@ def _validate_score_field(value: Any, field: str, is_float: bool = False) -> Any
         return 1.0 if is_float else 1
 
 
+def _parse_single_score(data: Dict[str, Any]) -> TrendScore:
+    """Parse a single score dict into a TrendScore. Raises ValueError on bad data."""
+    required_fields = {"velocity", "commercial", "safety", "uniqueness", "overall", "reasoning"}
+    missing = required_fields - set(data.keys())
+    if missing:
+        raise ValueError(f"Missing required fields: {missing}")
+
+    return TrendScore(
+        velocity=_validate_score_field(data["velocity"], "velocity"),
+        commercial=_validate_score_field(data["commercial"], "commercial"),
+        safety=_validate_score_field(data["safety"], "safety"),
+        uniqueness=_validate_score_field(data["uniqueness"], "uniqueness"),
+        overall=_validate_score_field(data["overall"], "overall", is_float=True),
+        reasoning=str(data.get("reasoning", "")),
+    )
+
+
 def parse_score_response(raw_json: str) -> TrendScore:
     """
-    Parse a GPT-4o-mini JSON response into a TrendScore.
+    Parse a single-trend JSON response into a TrendScore.
 
     Args:
         raw_json: Raw JSON string from the model.
@@ -109,19 +127,54 @@ def parse_score_response(raw_json: str) -> TrendScore:
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object, got {type(data).__name__}")
 
-    required_fields = {"velocity", "commercial", "safety", "uniqueness", "overall", "reasoning"}
-    missing = required_fields - set(data.keys())
-    if missing:
-        raise ValueError(f"Missing required fields: {missing}")
+    return _parse_single_score(data)
 
-    return TrendScore(
-        velocity=_validate_score_field(data["velocity"], "velocity"),
-        commercial=_validate_score_field(data["commercial"], "commercial"),
-        safety=_validate_score_field(data["safety"], "safety"),
-        uniqueness=_validate_score_field(data["uniqueness"], "uniqueness"),
-        overall=_validate_score_field(data["overall"], "overall", is_float=True),
-        reasoning=str(data.get("reasoning", "")),
-    )
+
+def parse_batch_response(raw_json: str, expected_count: int) -> Dict[int, TrendScore]:
+    """
+    Parse a batch JSON response into a dict of index -> TrendScore.
+
+    Args:
+        raw_json: Raw JSON string with a "scores" array.
+        expected_count: How many trends were sent (for logging).
+
+    Returns:
+        Dict mapping 0-based trend index to TrendScore.
+
+    Raises:
+        ValueError: If the JSON is malformed or the scores array is missing.
+    """
+    try:
+        data = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Malformed JSON response: {exc}") from exc
+
+    if not isinstance(data, dict) or "scores" not in data:
+        raise ValueError(f"Expected JSON object with 'scores' key, got: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
+
+    scores_list = data["scores"]
+    if not isinstance(scores_list, list):
+        raise ValueError(f"'scores' must be an array, got {type(scores_list).__name__}")
+
+    result: Dict[int, TrendScore] = {}
+    for item in scores_list:
+        if not isinstance(item, dict):
+            continue
+        idx = item.get("index")
+        if idx is None:
+            continue
+        try:
+            result[int(idx) - 1] = _parse_single_score(item)  # convert 1-based to 0-based
+        except (ValueError, TypeError) as exc:
+            logger.warning("Failed to parse score for index %s: %s", idx, exc)
+
+    if len(result) < expected_count:
+        logger.warning(
+            "Batch response returned %d scores, expected %d",
+            len(result), expected_count,
+        )
+
+    return result
 
 
 class TrendScorer:
@@ -235,8 +288,9 @@ class TrendScorer:
         threshold: float = OVERALL_THRESHOLD,
     ) -> List[Dict[str, Any]]:
         """
-        Score a list of trends and return only those meeting the threshold.
+        Score a list of trends in a single batch API call and return qualifying ones.
 
+        Sends all trends in one prompt to minimize API quota usage.
         Each qualifying trend dict gets score fields added directly.
 
         Args:
@@ -246,27 +300,69 @@ class TrendScorer:
         Returns:
             List of qualifying trend dicts with score fields populated.
         """
-        qualified: List[Dict[str, Any]] = []
+        if not trends:
+            return []
 
-        for trend in trends:
+        if not self._client:
+            logger.error("LLM client not available, cannot score trends")
+            return []
+
+        # Build numbered trend block for the prompt
+        lines = []
+        for i, trend in enumerate(trends, start=1):
             topic = trend.get("topic", "")
-            sample = json.dumps(trend.get("source_data", {}))[:500]
-            sources = ", ".join(trend.get("sources", [trend.get("source", "")]))
+            source = trend.get("source", "unknown")
+            lines.append(f"{i}. [{source}] {topic}")
+        trends_block = "\n".join(lines)
 
-            score = self.score_trend(topic, sample_posts=sample, source_list=sources)
+        user_prompt = BATCH_PROMPT_TEMPLATE.format(trends_block=trends_block)
+
+        for attempt in range(1, MAX_JSON_RETRIES + 2):
+            try:
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.3,
+                )
+                raw_content = response.choices[0].message.content or ""
+                scores_by_index = parse_batch_response(raw_content, expected_count=len(trends))
+                break
+
+            except ValueError as exc:
+                logger.warning("Batch JSON parse failed (attempt %d/%d): %s", attempt, MAX_JSON_RETRIES + 1, exc)
+                if attempt > MAX_JSON_RETRIES:
+                    logger.error("All batch JSON retries exhausted, skipping scoring")
+                    return []
+
+            except Exception as exc:
+                logger.error("LLM API error during batch scoring (attempt %d): %s", attempt, exc)
+                if attempt > MAX_JSON_RETRIES:
+                    return []
+        else:
+            return []
+
+        qualified: List[Dict[str, Any]] = []
+        for i, trend in enumerate(trends):
+            topic = trend.get("topic", "")
+            score = scores_by_index.get(i)
 
             if score is None:
-                logger.warning("Failed to score trend '%s', skipping", topic[:50])
+                logger.warning("No score returned for trend '%s', skipping", topic[:50])
                 continue
+
+            logger.info(
+                "Scored trend '%s': overall=%.1f (%s)",
+                topic[:50], score.overall,
+                "QUALIFIES" if score.qualifies(threshold) else "below threshold",
+            )
 
             if score.qualifies(threshold):
                 trend.update(score.to_dict())
                 qualified.append(trend)
-            else:
-                logger.info(
-                    "Trend '%s' below threshold (%.1f < %.1f), filtered out",
-                    topic[:50], score.overall, threshold,
-                )
 
         logger.info(
             "Scoring complete: %d/%d trends qualified (threshold=%.1f)",
