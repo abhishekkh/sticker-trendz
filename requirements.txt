@@ -13,6 +13,7 @@ boto3==1.35.86
 
 # Image Processing
 Pillow==11.1.0
+numpy==2.2.2
 
 # Email
 resend==2.7.0
