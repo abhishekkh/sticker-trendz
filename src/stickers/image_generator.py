@@ -366,7 +366,7 @@ def main() -> None:
     logger.info("Starting sticker generator")
 
     try:
-        cfg = load_config()
+        cfg = load_config(require_all=False)
     except Exception as exc:
         logger.critical("Failed to load config: %s", exc)
         sys.exit(1)
