@@ -23,10 +23,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def has_reddit_creds() -> bool:
-    return bool(os.getenv("REDDIT_CLIENT_ID") and os.getenv("REDDIT_CLIENT_SECRET"))
-
-
 def has_replicate_creds() -> bool:
     return bool(os.getenv("REPLICATE_API_TOKEN"))
 
@@ -60,9 +56,6 @@ def has_r2_creds() -> bool:
 # Skip decorators
 # ---------------------------------------------------------------------------
 
-skip_if_no_reddit = pytest.mark.skipif(
-    not has_reddit_creds(), reason="Missing REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET"
-)
 skip_if_no_replicate = pytest.mark.skipif(
     not has_replicate_creds(), reason="Missing REPLICATE_API_TOKEN"
 )

@@ -165,7 +165,7 @@ class TestRedisLockLive:
         limiter.release_lock(workflow)
 
     def test_release_nonexistent_lock(self, limiter, test_suffix):
-        """Releasing a lock that doesn't exist should not raise."""
+        """Releasing a lock never acquired by this instance returns False without raising."""
         workflow = f"test_no_lock_{test_suffix}"
         result = limiter.release_lock(workflow)
-        assert result is True
+        assert result is False

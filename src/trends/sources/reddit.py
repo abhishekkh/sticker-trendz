@@ -1,17 +1,18 @@
 """
 Reddit trend source for Sticker Trendz.
 
-Fetches rising/trending posts from configured subreddits via the Reddit
-OAuth API (using PRAW). Extracts keywords, hashtags, and topics from post
-titles and content.
+Fetches hot posts from configured subreddits via Reddit's public
+unauthenticated JSON API (no OAuth credentials required).
+Extracts keywords and topics from post titles and content.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-import string
 from typing import Any, Dict, List, Optional, Set
+
+import requests
 
 from src.config import load_config
 from src.resilience import retry, RetryExhaustedError
@@ -24,6 +25,10 @@ DEFAULT_SUBREDDITS = ["memes", "funny", "trending"]
 # Common English stop words to filter out of keyword extraction
 MAX_TOPIC_LENGTH = 500
 MAX_SELFTEXT_LENGTH = 1000
+
+# Reddit public JSON API — no auth needed
+_REDDIT_BASE_URL = "https://www.reddit.com"
+_REQUEST_TIMEOUT = 10  # seconds
 
 # Regex for stripping HTML tags and control characters
 _HTML_TAG_RE = re.compile(r"<[^>]*>")
@@ -100,70 +105,67 @@ def extract_keywords(text: str, max_keywords: int = 10) -> List[str]:
 
 class RedditSource:
     """
-    Reddit OAuth API client for fetching trending posts.
+    Reddit public JSON API client for fetching trending posts.
 
     Monitors r/memes, r/funny, r/trending, and configurable niche subs.
-    Respects 60 req/min rate limit (handled by PRAW internally).
+    Uses unauthenticated requests to <subreddit>/hot.json — no OAuth needed.
+    Rate limit: ~10 req/min unauthenticated, well within our 2-hour poll cycle.
     """
 
     def __init__(
         self,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
         user_agent: Optional[str] = None,
         subreddits: Optional[List[str]] = None,
-        reddit_client: Optional[Any] = None,
+        session: Optional[requests.Session] = None,
     ) -> None:
         """
         Args:
-            client_id: Reddit app client ID. Falls back to config.
-            client_secret: Reddit app client secret. Falls back to config.
-            user_agent: User agent string. Falls back to config.
+            user_agent: User-Agent header value. Falls back to config/default.
             subreddits: List of subreddit names to monitor.
-            reddit_client: Pre-built PRAW Reddit instance (for testing).
+            session: Pre-built requests.Session (for testing / connection reuse).
         """
         self._subreddits = subreddits or DEFAULT_SUBREDDITS
-        self._reddit = reddit_client
 
-        if not self._reddit:
-            cfg = load_config(require_all=False)
-            _id = client_id or cfg.reddit.client_id
-            _secret = client_secret or cfg.reddit.client_secret
-            _agent = user_agent or cfg.reddit.user_agent
+        cfg = load_config(require_all=False)
+        self._user_agent = user_agent or cfg.reddit.user_agent
 
-            try:
-                import praw
-                self._reddit = praw.Reddit(
-                    client_id=_id,
-                    client_secret=_secret,
-                    user_agent=_agent,
-                )
-                logger.info("Reddit client initialized (read-only)")
-            except Exception as exc:
-                logger.error("Failed to initialize Reddit client: %s", exc)
-                self._reddit = None
+        if session is not None:
+            self._session = session
+        else:
+            self._session = requests.Session()
+            self._session.headers.update({"User-Agent": self._user_agent})
+
+        logger.info("RedditSource initialized (unauthenticated public API)")
 
     @retry(max_retries=3, service="reddit")
     def _fetch_subreddit_hot(self, subreddit_name: str, limit: int = 25) -> List[Dict[str, Any]]:
-        """Fetch hot posts from a single subreddit."""
-        if not self._reddit:
-            raise RuntimeError("Reddit client not initialized")
+        """Fetch hot posts from a single subreddit via the public JSON endpoint."""
+        url = f"{_REDDIT_BASE_URL}/r/{subreddit_name}/hot.json"
+        response = self._session.get(
+            url,
+            params={"limit": limit},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
 
-        subreddit = self._reddit.subreddit(subreddit_name)
+        data = response.json()
+        children = data.get("data", {}).get("children", [])
+
         posts = []
-        for submission in subreddit.hot(limit=limit):
+        for child in children:
+            p = child.get("data", {})
             posts.append({
-                "id": submission.id,
-                "title": sanitize_external_text(submission.title, MAX_TOPIC_LENGTH),
-                "score": submission.score,
-                "upvote_ratio": submission.upvote_ratio,
-                "num_comments": submission.num_comments,
-                "url": submission.url,
+                "id": p.get("id", ""),
+                "title": sanitize_external_text(p.get("title", ""), MAX_TOPIC_LENGTH),
+                "score": p.get("score", 0),
+                "upvote_ratio": p.get("upvote_ratio", 0.0),
+                "num_comments": p.get("num_comments", 0),
+                "url": p.get("url", ""),
                 "selftext": sanitize_external_text(
-                    getattr(submission, "selftext", ""), MAX_SELFTEXT_LENGTH
+                    p.get("selftext", ""), MAX_SELFTEXT_LENGTH
                 ),
                 "subreddit": subreddit_name,
-                "created_utc": submission.created_utc,
+                "created_utc": p.get("created_utc", 0),
             })
         return posts
 

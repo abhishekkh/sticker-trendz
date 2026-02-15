@@ -15,7 +15,6 @@ boto3==1.35.86
 Pillow==11.1.0
 
 # Trend Sources
-praw==7.8.1
 pytrends==4.9.2
 
 # Email

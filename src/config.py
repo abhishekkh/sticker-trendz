@@ -147,8 +147,6 @@ class EtsyConfig:
 
 @dataclass(frozen=True)
 class RedditConfig:
-    client_id: str
-    client_secret: str
     user_agent: str
 
 
@@ -256,8 +254,6 @@ def load_config(require_all: bool = True) -> AppConfig:
             shop_sections=_load_shop_sections(),
         ),
         reddit=RedditConfig(
-            client_id=getter("REDDIT_CLIENT_ID"),
-            client_secret=getter("REDDIT_CLIENT_SECRET"),
             user_agent=_optional("REDDIT_USER_AGENT", "sticker-trendz/1.0"),
         ),
         fulfillment=FulfillmentConfig(
