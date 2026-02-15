@@ -27,6 +27,25 @@ SYSTEM_PROMPT = (
     "Score trends on four dimensions."
 )
 
+USER_PROMPT_TEMPLATE = """Score this trend for sticker commercial viability.
+
+Trend: {topic}
+Context: {sample_posts}
+Sources: {source_list}
+
+Return a JSON object with these exact fields:
+- velocity (integer 1-10): how fast is this trend growing
+- commercial (integer 1-10): would 18-35 year olds buy a sticker of this
+- safety (integer 1-10): is it brand-safe and non-controversial
+- uniqueness (integer 1-10): is it a fresh topic or already overdone
+- overall (float 1.0-10.0): weighted composite score
+- reasoning (string): one sentence explaining your score
+
+Reference calibration:
+- Score 9-10: "Moo Deng baby hippo" (viral, unique, extremely stickerable, brand-safe)
+- Score 6-7: "Taylor Swift Eras Tour" (commercial but trademark-heavy, overdone)
+- Score 3-4: "Federal Reserve rate decision" (not stickerable, no youth appeal)"""
+
 BATCH_PROMPT_TEMPLATE = """Score each trend below for sticker commercial viability.
 
 {trends_block}

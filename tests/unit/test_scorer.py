@@ -12,7 +12,7 @@ from src.trends.scorer import (
     parse_score_response,
     OVERALL_THRESHOLD,
     SYSTEM_PROMPT,
-    USER_PROMPT_TEMPLATE,
+    BATCH_PROMPT_TEMPLATE,
     MAX_JSON_RETRIES,
 )
 
@@ -321,7 +321,7 @@ class TestTrendScorerWithMockedOpenAI:
 
 
 class TestTrendScorerScoreAndFilter:
-    """TrendScorer.score_and_filter: qualifying vs filtered out."""
+    """TrendScorer.score_and_filter: qualifying vs filtered out (uses batch API call)."""
 
     def _make_mock_client_returning(self, content: str):
         mock_response = MagicMock()
@@ -333,7 +333,11 @@ class TestTrendScorerScoreAndFilter:
 
     def test_qualifying_trends_included_with_score_fields(self):
         """Trends scoring >= 7.0 are included with score fields populated."""
-        mock_client = self._make_mock_client_returning(VALID_SCORE_QUALIFYING)
+        batch_response = json.dumps({"scores": [
+            {"index": 1, "velocity": 8, "commercial": 8, "safety": 9, "uniqueness": 7,
+             "overall": 7.5, "reasoning": "Viral and sticker-friendly topic."},
+        ]})
+        mock_client = self._make_mock_client_returning(batch_response)
         scorer = TrendScorer(openai_client=mock_client)
 
         trends = [
@@ -349,7 +353,11 @@ class TestTrendScorerScoreAndFilter:
 
     def test_below_threshold_trends_filtered_out(self):
         """Trends scoring < 7.0 are not included in score_and_filter result."""
-        mock_client = self._make_mock_client_returning(VALID_SCORE_BELOW_THRESHOLD)
+        batch_response = json.dumps({"scores": [
+            {"index": 1, "velocity": 5, "commercial": 6, "safety": 8, "uniqueness": 4,
+             "overall": 5.5, "reasoning": "Moderate appeal, somewhat overdone."},
+        ]})
+        mock_client = self._make_mock_client_returning(batch_response)
         scorer = TrendScorer(openai_client=mock_client)
 
         trends = [
@@ -361,21 +369,13 @@ class TestTrendScorerScoreAndFilter:
 
     def test_mixed_trends_only_qualifying_returned(self):
         """When multiple trends are scored, only those >= threshold are returned."""
-        call_count = [0]
-
-        def side_effect(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                content = VALID_SCORE_QUALIFYING
-            else:
-                content = VALID_SCORE_BELOW_THRESHOLD
-            mock_r = MagicMock()
-            mock_r.choices = [MagicMock()]
-            mock_r.choices[0].message.content = content
-            return mock_r
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = side_effect
+        batch_response = json.dumps({"scores": [
+            {"index": 1, "velocity": 8, "commercial": 8, "safety": 9, "uniqueness": 7,
+             "overall": 7.5, "reasoning": "Viral and sticker-friendly topic."},
+            {"index": 2, "velocity": 5, "commercial": 6, "safety": 8, "uniqueness": 4,
+             "overall": 5.5, "reasoning": "Moderate appeal, somewhat overdone."},
+        ]})
+        mock_client = self._make_mock_client_returning(batch_response)
         scorer = TrendScorer(openai_client=mock_client)
 
         trends = [
@@ -398,22 +398,20 @@ class TestPromptConstants:
         assert "trend" in SYSTEM_PROMPT.lower() or "score" in SYSTEM_PROMPT.lower()
 
     def test_user_prompt_template_has_placeholders(self):
-        """USER_PROMPT_TEMPLATE has topic, sample_posts, source_list placeholders."""
-        assert "{topic}" in USER_PROMPT_TEMPLATE
-        assert "{sample_posts}" in USER_PROMPT_TEMPLATE
-        assert "{source_list}" in USER_PROMPT_TEMPLATE
+        """BATCH_PROMPT_TEMPLATE has trends_block placeholder."""
+        assert "{trends_block}" in BATCH_PROMPT_TEMPLATE
 
     def test_user_prompt_includes_calibration_examples(self):
         """User prompt includes calibration examples (Moo Deng, Taylor Swift, Federal Reserve)."""
-        assert "Moo Deng" in USER_PROMPT_TEMPLATE or "9-10" in USER_PROMPT_TEMPLATE
-        assert "Taylor Swift" in USER_PROMPT_TEMPLATE or "6-7" in USER_PROMPT_TEMPLATE
-        assert "Federal Reserve" in USER_PROMPT_TEMPLATE or "3-4" in USER_PROMPT_TEMPLATE
+        assert "Moo Deng" in BATCH_PROMPT_TEMPLATE or "9-10" in BATCH_PROMPT_TEMPLATE
+        assert "Taylor Swift" in BATCH_PROMPT_TEMPLATE or "6-7" in BATCH_PROMPT_TEMPLATE
+        assert "Federal Reserve" in BATCH_PROMPT_TEMPLATE or "3-4" in BATCH_PROMPT_TEMPLATE
 
     def test_user_prompt_requests_json_fields(self):
         """User prompt requests velocity, commercial, safety, uniqueness, overall, reasoning."""
-        assert "velocity" in USER_PROMPT_TEMPLATE
-        assert "commercial" in USER_PROMPT_TEMPLATE
-        assert "safety" in USER_PROMPT_TEMPLATE
-        assert "uniqueness" in USER_PROMPT_TEMPLATE
-        assert "overall" in USER_PROMPT_TEMPLATE
-        assert "reasoning" in USER_PROMPT_TEMPLATE
+        assert "velocity" in BATCH_PROMPT_TEMPLATE
+        assert "commercial" in BATCH_PROMPT_TEMPLATE
+        assert "safety" in BATCH_PROMPT_TEMPLATE
+        assert "uniqueness" in BATCH_PROMPT_TEMPLATE
+        assert "overall" in BATCH_PROMPT_TEMPLATE
+        assert "reasoning" in BATCH_PROMPT_TEMPLATE
