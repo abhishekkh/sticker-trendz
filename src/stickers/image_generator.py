@@ -17,7 +17,7 @@ import httpx
 
 from src.config import load_config, setup_logging
 from src.db import SupabaseClient, DatabaseError
-from src.resilience import retry, RetryExhaustedError
+from src.resilience import retry, RetryExhaustedError, NonRetryableError
 from src.monitoring.pipeline_logger import PipelineRunLogger
 from src.monitoring.error_logger import ErrorLogger
 from src.monitoring.alerter import EmailAlerter
@@ -108,16 +108,24 @@ class ImageGenerator:
             else self._model_id
         )
 
-        output = self._replicate_client.run(
-            model_ref,
-            input={
-                "prompt": prompt,
-                "width": self._image_size,
-                "height": self._image_size,
-                "num_outputs": 1,
-                "output_format": "png",
-            },
-        )
+        try:
+            output = self._replicate_client.run(
+                model_ref,
+                input={
+                    "prompt": prompt,
+                    "width": self._image_size,
+                    "height": self._image_size,
+                    "num_outputs": 1,
+                    "output_format": "png",
+                },
+            )
+        except Exception as exc:
+            # 402 Payment Required — billing issue, retrying won't help
+            exc_str = str(exc).lower()
+            if "402" in exc_str or "insufficient credit" in exc_str or "payment required" in exc_str:
+                logger.error("Replicate billing error (402) — add credits at https://replicate.com/account/billing: %s", exc)
+                raise NonRetryableError(exc) from exc
+            raise
 
         # Replicate returns a list of URLs
         if not isinstance(output, list) or len(output) == 0:

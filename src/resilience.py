@@ -166,6 +166,14 @@ class RetryExhaustedError(Exception):
         )
 
 
+class NonRetryableError(Exception):
+    """Wrap an error that must not be retried (e.g. billing, auth, bad request)."""
+
+    def __init__(self, original: Exception):
+        self.original = original
+        super().__init__(str(original))
+
+
 def retry(
     max_retries: int = 3,
     backoff_base: float = 2.0,
@@ -217,6 +225,8 @@ def retry(
                     if service:
                         registry.get(service).record_success()
                     return result
+                except NonRetryableError:
+                    raise
                 except retryable_exceptions as exc:
                     last_exception = exc
                     if service:
