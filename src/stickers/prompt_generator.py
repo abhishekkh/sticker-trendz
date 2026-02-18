@@ -21,16 +21,20 @@ PROMPTS_PER_TREND = 3
 STYLE_DIRECTIVES = (
     "die-cut vinyl sticker design, bold black outlines, vibrant colors, "
     "white background, cartoon illustration style, simple and clean, "
-    "suitable for laptop or water bottle sticker. "
+    "2-3 inch size suitable for laptops, water bottles, phone cases, and skateboards. "
     "No text, no words, no letters, no brand names, no logos. "
-    "High contrast, fun and trendy aesthetic."
+    "High contrast, fun and trendy aesthetic aimed at 15-30 year olds."
 )
 
 SYSTEM_PROMPT = (
-    "You are a creative director for a trending sticker business. "
-    "Generate unique image prompts for die-cut vinyl stickers that capture "
-    "the essence of trending topics. Each prompt must be visually distinct "
-    "and suitable for AI image generation."
+    "You are a creative director for a trending sticker business targeting people aged 15-30. "
+    "Your stickers are die-cut vinyl and designed to be placed on laptops, water bottles, "
+    "phone cases, and skateboards. "
+    "Generate unique, visually engaging image prompts that capture the essence of trending "
+    "topics in a way that resonates with Gen Z and young millennials. "
+    "When given a single-word or short trend, expand it into a vivid, specific visual concept "
+    "that will look great as a small 2-3 inch sticker. "
+    "Each prompt must be visually distinct and optimised for AI image generation."
 )
 
 USER_PROMPT_TEMPLATE = """Generate exactly 3 image prompts for die-cut vinyl stickers inspired by this trend.
@@ -38,14 +42,20 @@ USER_PROMPT_TEMPLATE = """Generate exactly 3 image prompts for die-cut vinyl sti
 Trend: {topic}
 Context: {context}
 
+Target audience: people aged 15-30 (Gen Z and young millennials)
+Intended surfaces: laptops, water bottles, phone cases, skateboards (2-3 inch size)
+
+Important: if the trend is a single word or short phrase, expand it into a specific, vivid visual \
+scene or character that captures its cultural meaning for this age group.
+
 Requirements for each prompt:
 - Must describe a die-cut vinyl sticker design
 - Bold black outlines, vibrant colors, white background
 - Cartoon illustration style, simple and clean
-- Suitable for laptop or water bottle sticker
+- Compact composition that reads clearly at 2-3 inches
 - NO text, words, letters, brand names, logos, or recognizable characters
-- Each prompt should be a unique visual interpretation
-- High contrast, fun and trendy aesthetic
+- Each prompt should be a unique visual interpretation (vary subject, mood, and composition)
+- High contrast, fun and trendy aesthetic that appeals to 15-30 year olds
 
 Return a JSON object with a "prompts" array containing exactly 3 prompt strings.
 Each prompt should be 1-2 sentences describing the visual design."""
@@ -180,8 +190,17 @@ class PromptGenerator:
     def _fallback_prompts(topic: str, count: int) -> List[str]:
         """Generate simple fallback prompts when the AI call fails."""
         variations = [
-            f"A {STYLE_DIRECTIVES} Cute cartoon interpretation of {topic}, centered composition.",
-            f"A {STYLE_DIRECTIVES} Fun and playful illustration inspired by {topic}, simple design.",
-            f"A {STYLE_DIRECTIVES} Trendy pop-art style illustration related to {topic}, eye-catching design.",
+            (
+                f"A {STYLE_DIRECTIVES} Cute cartoon character embodying the concept of '{topic}', "
+                "centered compact composition that pops at 2-3 inches."
+            ),
+            (
+                f"A {STYLE_DIRECTIVES} Fun and playful illustration inspired by '{topic}', "
+                "bold shapes and vivid colors that appeal to Gen Z."
+            ),
+            (
+                f"A {STYLE_DIRECTIVES} Trendy pop-art style illustration capturing the energy of '{topic}', "
+                "eye-catching design perfect for a laptop lid."
+            ),
         ]
         return variations[:count]
