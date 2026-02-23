@@ -9,7 +9,7 @@ supabase==2.11.0
 redis==5.2.1
 
 # Storage (S3-compatible for Cloudflare R2)
-boto3==1.35.86
+boto3==1.42.49
 
 # Image Processing
 Pillow==11.1.0
